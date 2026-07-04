@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Family Games</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100vh; color: #fff;
+    background: linear-gradient(135deg, #1a2a6c 0%, #2a5298 50%, #1e3c72 100%);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 40px 20px;
+  }
+  h1 { font-size: clamp(2rem, 6vw, 3.5rem); letter-spacing: 1px; text-shadow: 0 3px 12px rgba(0,0,0,.4); }
+  .subtitle { opacity: .85; margin-top: 8px; font-size: 1.05rem; }
+  .cards {
+    display: grid; gap: 28px; margin-top: 48px; width: 100%; max-width: 1000px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  }
+  .card {
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 18px; padding: 30px 26px; text-decoration: none; color: #fff;
+    display: flex; flex-direction: column; gap: 12px;
+    transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
+    backdrop-filter: blur(6px);
+  }
+  .card:hover { transform: translateY(-6px); background: rgba(255,255,255,.16); box-shadow: 0 14px 40px rgba(0,0,0,.35); }
+  .icon { font-size: 3.2rem; line-height: 1; }
+  .card h2 { font-size: 1.5rem; }
+  .card p { opacity: .82; font-size: .97rem; line-height: 1.4; }
+  .tag { align-self: flex-start; margin-top: 6px; font-size: .78rem; letter-spacing: .5px;
+         background: rgba(255,255,255,.18); padding: 4px 10px; border-radius: 999px; text-transform: uppercase; }
+  footer { margin-top: auto; padding-top: 48px; }
+  .teacher-link { color: #ffe08a; text-decoration: none; font-weight: 600; opacity: .9; }
+  .teacher-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <h1>🎮 Family Games</h1>
+  <p class="subtitle">Pick a game — one login works across all of them.</p>
+
+  <div class="cards">
+    <a class="card" href="/math/">
+      <div class="icon">🐊</div>
+      <h2>Math Gator</h2>
+      <p>Feed the gator the correct answers to addition, subtraction, multiplication &amp; division facts.</p>
+      <span class="tag">Math facts</span>
+    </a>
+    <a class="card" href="/spelling/">
+      <div class="icon">👾</div>
+      <h2>Spelling Invaders</h2>
+      <p>Rescue the correctly-spelled words as they fall — and don't shoot the misspellings!</p>
+      <span class="tag">Spelling · rescue</span>
+    </a>
+    <a class="card" href="/sniper/">
+      <div class="icon">🎯</div>
+      <h2>Spelling Sniper</h2>
+      <p>Snipe the misspelled words, then type the correct spelling to score.</p>
+      <span class="tag">Spelling · snipe</span>
+    </a>
+  </div>
+
+  <footer>
+    <a class="teacher-link" href="/teacher">👩‍🏫 Teacher / Parent Dashboard</a>
+  </footer>
+</body>
+</html>

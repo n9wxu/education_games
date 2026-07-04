@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Spelling Sniper</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #0a0a1a; overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif; color: #fff;
+    touch-action: manipulation; }
+
+  .screen { display: none; position: fixed; inset: 0; }
+  .screen.active { display: block; }
+
+  /* ── Auth ── */
+  #auth-screen { display: none; }
+  #auth-screen.active { display: flex; align-items: center; justify-content: center; }
+  .card { background: #111428; border: 1px solid #334; border-radius: 12px;
+    padding: 28px 36px; min-width: 320px; max-width: 420px; width: 90%; }
+  .card h1 { font-size: 2rem; text-align: center; margin-bottom: 20px;
+    background: linear-gradient(135deg,#ff6644,#ff44aa); -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent; }
+  .card h2 { font-size: 1.3rem; text-align: center; margin-bottom: 16px; color: #aac; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: .85rem; color: #88a; margin-bottom: 4px; }
+  .field input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #334;
+    background: #0c0d1a; color: #fff; font-size: 1rem; }
+  .field input:focus { outline: none; border-color: #ff6644; }
+  .btn { width: 100%; padding: 11px; border: none; border-radius: 8px; font-size: 1rem;
+    font-weight: 600; cursor: pointer; transition: filter .15s; }
+  .btn:hover { filter: brightness(1.15); }
+  .btn-primary { background: linear-gradient(135deg,#ff6644,#ff44aa); color: #fff; }
+  .btn-secondary { background: #223; color: #aac; border: 1px solid #445; margin-top: 6px; }
+  .err { color: #f66; font-size: .85rem; margin-top: 4px; min-height: 1.2em; }
+
+  /* ── Lobby ── */
+  #lobby-screen { overflow-y: auto; }
+  #lobby-screen.active { display: block; }
+  .lobby-wrap { max-width: 700px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  .lobby-hero { text-align: center; padding: 28px 0 24px; }
+  .lobby-hero h1 { font-size: 2rem; background: linear-gradient(135deg,#ff6644,#ff44aa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
+  .lobby-hero .username { color: #88a; font-size: .9rem; margin-bottom: 20px; }
+
+  .join-btn { display: inline-block; padding: 14px 48px; border: none; border-radius: 10px;
+    font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: filter .15s;
+    background: linear-gradient(135deg,#ff6644,#ff44aa); color: #fff; }
+  .join-btn:hover { filter: brightness(1.15); }
+  .join-btn:disabled { opacity: .4; cursor: default; filter: none; }
+
+  .howto { background: #0d1022; border: 1px solid #2a1a3a; border-radius: 10px;
+    padding: 14px 18px; margin: 14px 0; font-size: .88rem; color: #bbcc; line-height: 1.6; }
+  .howto strong { color: #ff8866; }
+
+  .roster-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin-top: 14px; min-height: 28px; }
+  .roster-pip { padding: 4px 12px; border-radius: 20px; font-size: .8rem;
+    border: 1.5px solid; display: flex; align-items: center; gap: 6px; }
+  .roster-pip .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  .color-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .color-swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; transition: border-color .15s, transform .12s; }
+  .color-swatch:hover { transform: scale(1.18); }
+  .color-swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.35); }
+
+  .ship-row { display: flex; gap: 6px; justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .ship-swatch { width: 50px; height: 50px; border-radius: 8px; cursor: pointer;
+    border: 2px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);
+    transition: border-color .15s, transform .12s; }
+  .ship-swatch:hover { transform: scale(1.1); border-color: rgba(255,255,255,.3); }
+  .ship-swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.3); }
+
+  .section { background: #111428; border: 1px solid #223; border-radius: 10px;
+    padding: 16px 18px; margin-bottom: 14px; }
+  .section-title { font-size: .75rem; font-weight: 700; color: #556;
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px; }
+
+  .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat-box { background: #0d0f20; border: 1px solid #334; border-radius: 8px;
+    padding: 10px 16px; text-align: center; flex: 1; min-width: 80px; }
+  .stat-box .val { font-size: 1.4rem; font-weight: 700; color: #fff; }
+  .stat-box .lbl { font-size: .7rem; color: #556; margin-top: 2px; }
+  .stat-box.hi { border-color: #ff6644; }
+  .stat-box.hi .val { color: #ff8866; }
+
+  .word-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .word-chip { background: #1a2040; border: 1px solid #334; border-radius: 16px;
+    padding: 4px 11px; font-size: .85rem; display: flex; align-items: center; gap: 5px; }
+  .word-chip.mastered { border-color: #44dd88; background: #0d2018; color: #cfc; }
+  .grade-badge { font-size: .68rem; color: #556; background: #0c0d1a;
+    border-radius: 8px; padding: 1px 5px; }
+  .mastered .grade-badge { color: #44dd88; }
+  .empty-msg { color: #445; font-size: .85rem; }
+
+  .grade-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+  .grade-row:last-child { margin-bottom: 0; }
+  .grade-label { font-size: .8rem; color: #778; width: 50px; flex-shrink: 0; }
+  .prog-wrap { flex: 1; background: #1a1c2e; border-radius: 4px; height: 9px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg,#ff6644,#ff44aa); transition: width .5s ease; }
+  .prog-count { font-size: .78rem; color: #445; width: 46px; text-align: right; flex-shrink: 0; }
+
+  .elim-row { display: flex; align-items: center; gap: 10px; padding: 7px 0;
+    border-bottom: 1px solid #1a1c30; font-size: .9rem; }
+  .elim-row:last-child { border-bottom: none; }
+  .elim-rank { color: #556; width: 28px; flex-shrink: 0; font-size: .8rem; }
+  .elim-name { flex: 1; font-weight: 600; }
+  .elim-stat { color: #778; font-size: .82rem; }
+  .elim-out  { font-size: .72rem; color: #ff4466; background: #2a0a10;
+    border-radius: 10px; padding: 1px 7px; }
+
+  #live-lb { position: absolute; top: 52px; right: 6px;
+    background: rgba(3,5,20,0.72); border: 1px solid rgba(60,80,160,0.35);
+    border-radius: 6px; padding: 5px 9px; font-size: .72rem;
+    pointer-events: none; min-width: 130px; }
+  .lb-row { display: flex; align-items: center; gap: 5px; padding: 2px 0;
+    border-bottom: 1px solid rgba(255,255,255,.04); }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-me { background: rgba(255,255,255,.05); border-radius: 3px; }
+  .lb-rank { color: #445; width: 14px; flex-shrink: 0; }
+  .lb-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-m { color: #44dd88; flex-shrink: 0; }
+  .lb-pts { color: #556; flex-shrink: 0; }
+  .lb-out { color: #ff4466; font-size: .65rem; flex-shrink: 0; }
+
+  /* ── Game ── */
+  #game-screen { background: #000; display: none; }
+  #game-screen.active { display: flex; align-items: center; justify-content: center; }
+  #game-wrap { position: relative; touch-action: none; }
+  canvas { display: block; cursor: crosshair; touch-action: none; }
+
+  #controls {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 12px; pointer-events: none;
+    background: linear-gradient(transparent, rgba(0,0,0,.5));
+  }
+  .ctrl-group { display: flex; gap: 8px; pointer-events: all; }
+  .ctrl-btn { width: 66px; height: 56px; border-radius: 10px;
+    border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.1);
+    color: #fff; font-size: 1.6rem; display: flex; align-items: center; justify-content: center;
+    user-select: none; -webkit-user-select: none; cursor: pointer;
+    transition: background .1s; -webkit-tap-highlight-color: transparent; }
+  .ctrl-btn:active, .ctrl-btn.pressed { background: rgba(255,255,255,.3); }
+  .ctrl-fire { width: 70px; height: 60px; font-size: 1.8rem;
+    background: rgba(255,80,80,.25); border-color: rgba(255,80,80,.5); }
+  @media (hover: hover) and (pointer: fine) { #controls { display: none; } }
+
+  #hud { position: absolute; top: 0; left: 0; right: 0; height: 50px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px; pointer-events: none; gap: 8px; }
+  #hud-left { display: flex; align-items: center; gap: 10px; }
+  #player-level { font-size: .85rem; font-weight: 700; color: #ff8866;
+    background: rgba(50,20,10,.7); border-radius: 6px; padding: 2px 8px;
+    border: 1px solid #632; }
+  #team-score { font-size: 1.3rem; font-weight: 700; color: #fff; text-shadow: 0 0 10px #f64; }
+  #player-badges { display: flex; gap: 6px; flex: 1; justify-content: center; }
+  .badge { padding: 3px 8px; border-radius: 6px; font-size: .72rem; font-weight: 600;
+    border: 1.5px solid; display: flex; align-items: center; gap: 4px; }
+  .badge .hearts { letter-spacing: -1px; }
+  #hud-right { display: flex; gap: 4px; pointer-events: all; }
+  .hud-btn { width: 32px; height: 32px; border-radius: 7px; border: 1px solid rgba(255,255,255,.2);
+    background: rgba(255,255,255,.08); color: #fff; font-size: 1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s; -webkit-tap-highlight-color: transparent; }
+  .hud-btn:hover { background: rgba(255,255,255,.18); }
+
+  #mastered-panel { position: absolute; left: 4px; top: 56px; bottom: 90px;
+    width: 112px; display: flex; flex-direction: column; gap: 4px;
+    overflow: hidden; pointer-events: none; }
+  #mastered-panel-title { font-size: .62rem; color: #445; text-transform: uppercase;
+    letter-spacing: .08em; padding: 0 4px; display: none; }
+  .mastered-tag { background: rgba(10,25,15,.82); border: 1px solid rgba(68,221,136,.45);
+    border-radius: 10px; padding: 2px 8px; font-size: .72rem; color: #44dd88;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    animation: tagSlide .35s ease; }
+  @keyframes tagSlide { from { opacity:0; transform:translateX(-18px); } to { opacity:1; transform:translateX(0); } }
+
+  /* ── Settings panel ── */
+  #settings-panel { display: none; position: absolute; top: 46px; right: 4px;
+    background: rgba(10,12,30,.95); border: 1px solid #334; border-radius: 10px;
+    padding: 14px 16px; z-index: 20; min-width: 200px; pointer-events: all; }
+  #settings-panel.open { display: block; }
+  .vol-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .vol-row:last-child { margin-bottom: 0; }
+  .vol-label { font-size: .75rem; color: #88a; width: 40px; flex-shrink: 0; }
+  .vol-row input[type=range] { flex: 1; accent-color: #ff6644; cursor: pointer; }
+
+  .lobby-vol { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .lobby-vol-row { display: flex; align-items: center; gap: 10px; }
+  .lobby-vol-row label { font-size: .8rem; color: #88a; width: 56px; flex-shrink: 0; }
+  .lobby-vol-row input[type=range] { flex: 1; accent-color: #ff6644; cursor: pointer; }
+
+  /* ── Spell-check overlay ── */
+  #spell-overlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,10,0.7);
+    align-items: center; justify-content: center;
+    z-index: 50;
+    backdrop-filter: blur(2px);
+  }
+  #spell-overlay.active { display: flex; }
+
+  .spell-card {
+    background: #0d0f24;
+    border: 2px solid #ff6644;
+    border-radius: 16px;
+    padding: 28px 36px;
+    min-width: 360px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(255,100,68,0.4);
+  }
+  .spell-card .bad-word {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #ff6644;
+    font-family: monospace;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .spell-card .spell-label {
+    font-size: .85rem;
+    color: #887;
+    margin-bottom: 18px;
+  }
+  .spell-card .spell-prompt {
+    font-size: 1rem;
+    color: #ccc;
+    margin-bottom: 12px;
+  }
+  #spell-input {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 2px solid #445;
+    background: #080a18;
+    color: #fff;
+    font-size: 1.4rem;
+    font-family: monospace;
+    letter-spacing: 2px;
+    text-align: center;
+    outline: none;
+    transition: border-color .15s;
+    margin-bottom: 8px;
+  }
+  #spell-input:focus { border-color: #ff6644; }
+  #spell-input.wrong { border-color: #ff4455; animation: shake .25s ease; }
+  #spell-input.correct { border-color: #44dd88; }
+  @keyframes shake {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(-8px); }
+    50%  { transform: translateX(8px); }
+    75%  { transform: translateX(-4px); }
+    100% { transform: translateX(0); }
+  }
+  .spell-err { font-size: .85rem; color: #ff6644; min-height: 1.2em; margin-bottom: 10px; }
+  .spell-hint { font-size: .78rem; color: #445; margin-top: 6px; }
+  #spell-submit {
+    padding: 10px 32px;
+    background: linear-gradient(135deg,#ff6644,#ff44aa);
+    border: none; border-radius: 8px; color: #fff;
+    font-size: 1rem; font-weight: 700; cursor: pointer;
+    transition: filter .15s;
+  }
+  #spell-submit:hover { filter: brightness(1.15); }
+
+  /* ── Freeze overlay (for non-shooter) ── */
+  #freeze-overlay {
+    display: none;
+    position: absolute; inset: 0;
+    background: rgba(0,0,10,0.55);
+    align-items: center; justify-content: center;
+    z-index: 49;
+    pointer-events: none;
+  }
+  #freeze-overlay.active { display: flex; }
+  .freeze-msg {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 20px #ff6644;
+    text-align: center;
+  }
+  .freeze-sub {
+    font-size: 1rem;
+    color: #ff9977;
+    margin-top: 8px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Auth ── -->
+<div id="auth-screen" class="screen active">
+  <div class="card">
+    <h1>🎯 Spelling Sniper</h1>
+    <div id="login-form">
+      <h2>Log In</h2>
+      <div class="field"><label>Username</label><input id="l-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+      <div class="field"><label>Password</label><input id="l-pass" type="password" autocomplete="current-password"></div>
+      <div class="err" id="l-err"></div>
+      <button class="btn btn-primary" onclick="doLogin()">Log In</button>
+      <button class="btn btn-secondary" onclick="showRegister()">Create Account</button>
+    </div>
+    <div id="register-form" style="display:none">
+      <h2>Create Account</h2>
+      <div class="field"><label>Username</label><input id="r-user" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+      <div class="field"><label>Password</label><input id="r-pass" type="password" autocomplete="new-password"></div>
+      <div class="err" id="r-err"></div>
+      <button class="btn btn-primary" onclick="doRegister()">Create Account</button>
+      <button class="btn btn-secondary" onclick="showLogin()">Back to Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Lobby ── -->
+<div id="lobby-screen" class="screen">
+  <div class="lobby-wrap">
+
+    <div class="lobby-hero">
+      <h1>🎯 Spelling Sniper</h1>
+      <div class="username" id="lobby-username"></div>
+      <div class="color-row" id="color-row"></div>
+      <div class="ship-row" id="ship-row"></div>
+      <div class="lobby-vol">
+        <div class="lobby-vol-row"><label>🎵 Music</label><input type="range" id="lob-music-vol" min="0" max="100" oninput="setMusicVol(this.value/100)"></div>
+        <div class="lobby-vol-row"><label>🔊 SFX</label><input type="range" id="lob-sfx-vol" min="0" max="100" oninput="setSfxVol(this.value/100)"></div>
+      </div>
+      <button class="join-btn" id="join-btn" onclick="joinGame()">Join Game</button>
+
+      <div class="howto">
+        <strong>How to play:</strong> Words fall from the sky — some are misspelled!
+        Shoot the <strong>misspelled</strong> words. When you hit one, the game freezes and you type the
+        <strong>correct spelling</strong>. Get it right to score points! Let correctly-spelled words fall through.
+        Lose a life if a misspelled word reaches the bottom.
+      </div>
+
+      <div class="roster-row" id="lobby-roster"></div>
+    </div>
+
+    <div id="elim-section" style="display:none">
+      <div class="section">
+        <div class="section-title">Session Leaderboard — You were eliminated!</div>
+        <div id="elim-board"></div>
+      </div>
+    </div>
+
+    <div id="session-section" style="display:none">
+      <div class="section">
+        <div class="section-title">Last Session</div>
+        <div class="stat-row" id="stat-row"></div>
+        <div class="section-title" style="margin-top:10px">Words Mastered This Session</div>
+        <div class="word-chips" id="mastered-chips"></div>
+      </div>
+    </div>
+
+    <div class="section" id="progress-section">
+      <div class="section-title">Your Mastery Progress</div>
+      <div id="grade-progress"><span class="empty-msg">Loading…</span></div>
+    </div>
+
+    <div class="section" id="mastered-words-section" style="display:none">
+      <div class="section-title">All Mastered Words</div>
+      <div class="word-chips" id="all-mastered-chips"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Game ── -->
+<div id="game-screen" class="screen">
+  <div id="game-wrap">
+    <canvas id="c"></canvas>
+
+    <div id="hud">
+      <div id="hud-left">
+        <div id="player-level">LV 1</div>
+        <div id="team-score">SCORE 0</div>
+      </div>
+      <div id="player-badges"></div>
+      <div id="hud-right">
+        <button class="hud-btn" id="fs-btn" title="Fullscreen">⛶</button>
+        <button class="hud-btn" id="gear-btn" title="Settings">⚙</button>
+      </div>
+      <div id="settings-panel">
+        <div class="vol-row"><span class="vol-label">🎵 Music</span><input type="range" id="music-vol" min="0" max="100" oninput="setMusicVol(this.value/100)"></div>
+        <div class="vol-row"><span class="vol-label">🔊 SFX</span><input type="range" id="sfx-vol" min="0" max="100" oninput="setSfxVol(this.value/100)"></div>
+      </div>
+    </div>
+
+    <div id="live-lb"></div>
+
+    <div id="mastered-panel">
+      <div id="mastered-panel-title">✨ Mastered</div>
+    </div>
+
+    <!-- Spell-check input overlay (shown to shooter when they hit a misspelling) -->
+    <div id="spell-overlay">
+      <div class="spell-card">
+        <div class="bad-word" id="spell-display-word"></div>
+        <div class="spell-label">is misspelled! Type the correct spelling:</div>
+        <div class="spell-prompt"></div>
+        <input id="spell-input" type="text" autocomplete="off" autocapitalize="none"
+               spellcheck="false" placeholder="correct spelling…"
+               oninput="clearSpellErr()"
+               onkeydown="if(event.key==='Enter')submitSpelling()">
+        <div class="spell-err" id="spell-err"></div>
+        <button id="spell-submit" onclick="submitSpelling()">Submit</button>
+        <div class="spell-hint">Press Enter or tap Submit</div>
+      </div>
+    </div>
+
+    <!-- Manual pause overlay (Escape key) -->
+    <div id="pause-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,10,0.65);
+      align-items:center;justify-content:center;z-index:48;pointer-events:none;">
+      <div style="text-align:center">
+        <div style="font-size:2.4rem;font-weight:700;color:#fff;text-shadow:0 0 20px #44aaff">⏸ PAUSED</div>
+        <div style="font-size:1rem;color:#88aacc;margin-top:8px">Press Escape to resume</div>
+      </div>
+    </div>
+
+    <!-- Freeze overlay (shown to everyone while someone is spelling) -->
+    <div id="freeze-overlay">
+      <div>
+        <div class="freeze-msg">❄️ FROZEN</div>
+        <div class="freeze-sub" id="freeze-msg-sub"></div>
+      </div>
+    </div>
+
+    <div id="controls">
+      <div class="ctrl-group">
+        <div class="ctrl-btn" id="btn-left">◀</div>
+        <div class="ctrl-btn" id="btn-right">▶</div>
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-btn ctrl-fire" id="btn-fire">🔥</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.libopenmpt = {
+    instantiateWasm: function(imports, successCallback) {
+      var wasmUrl = '/sniper/libopenmpt-0.8.7+release/bin/wasm/libopenmpt.wasm';
+      fetch(wasmUrl, { credentials: 'same-origin' })
+        .then(function(r) { return r.arrayBuffer(); })
+        .then(function(buf) { return WebAssembly.instantiate(buf, imports); })
+        .then(function(result) {
+          var mem = null;
+          var exp = result.instance.exports;
+          for (var k in exp) { if (exp[k] instanceof WebAssembly.Memory) { mem = exp[k]; break; } }
+          if (mem) {
+            var m = window.libopenmpt;
+            Object.defineProperty(m, 'HEAPU8',  { get: function(){ return new Uint8Array(mem.buffer);   }, configurable: true });
+            Object.defineProperty(m, 'HEAPF32', { get: function(){ return new Float32Array(mem.buffer); }, configurable: true });
+            Object.defineProperty(m, 'HEAPU32', { get: function(){ return new Uint32Array(mem.buffer);  }, configurable: true });
+            Object.defineProperty(m, 'HEAP32',  { get: function(){ return new Int32Array(mem.buffer);   }, configurable: true });
+          }
+          successCallback(result.instance, result.module);
+        })
+        .catch(function(e) { console.error('[wasm] load failed:', e); });
+      return {};
+    },
+    onRuntimeInitialized: function() {}
+  };
+</script>
+<script src="/sniper/libopenmpt-0.8.7+release/bin/wasm/libopenmpt.js"></script>
+<script>
+  var libopenmpt = window.libopenmpt;
+</script>
+<script src="/sniper/chiptune2.js/chiptune2.js"></script>
+<script src="/sniper/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

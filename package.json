@@ -1,0 +1,15 @@
+{
+  "name": "family-games",
+  "version": "1.0.0",
+  "description": "A collection of educational web games (Math Gator, Spelling Invaders, Spelling Sniper) served from one port with a shared database and unified teacher interface.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.10.0",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
+}

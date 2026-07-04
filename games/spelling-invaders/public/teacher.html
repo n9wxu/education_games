@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spelling Invaders — Teacher Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f1020;
+    color: #ccd; min-height: 100%; }
+  a { color: #4af; }
+
+  /* ── Layout ── */
+  #app { display: flex; min-height: 100vh; }
+  nav  { width: 200px; background: #090a14; padding: 20px 0; flex-shrink: 0;
+    border-right: 1px solid #223; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  main { flex: 1; padding: 24px; max-width: 1100px; }
+
+  nav h1  { font-size: 1rem; padding: 0 16px 16px; color: #fff; border-bottom: 1px solid #223; }
+  nav ul  { list-style: none; margin-top: 8px; }
+  nav li  { cursor: pointer; padding: 10px 16px; color: #99a; font-size: .9rem;
+    border-left: 3px solid transparent; transition: all .15s; }
+  nav li:hover, nav li.active { color: #fff; background: #111428; border-left-color: #4af; }
+
+  /* ── Auth gate ── */
+  #auth-gate { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .gate-card { background: #111428; border: 1px solid #334; border-radius: 12px;
+    padding: 32px 40px; text-align: center; min-width: 300px; }
+  .gate-card h2 { margin-bottom: 20px; color: #fff; }
+  .gate-card input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334;
+    background: #0c0d1a; color: #fff; font-size: 1rem; margin-bottom: 12px; }
+  .gate-card input:focus { outline: none; border-color: #4af; }
+
+  /* ── Generic UI ── */
+  h2.page-title { font-size: 1.4rem; color: #fff; margin-bottom: 20px; }
+  .section { background: #111428; border-radius: 10px; border: 1px solid #223; padding: 20px; margin-bottom: 20px; }
+  .section h3 { font-size: 1rem; color: #aaf; margin-bottom: 14px; }
+  .btn { padding: 8px 16px; border: none; border-radius: 7px; font-size: .875rem;
+    font-weight: 600; cursor: pointer; transition: filter .15s; }
+  .btn:hover { filter: brightness(1.15); }
+  .btn-primary   { background: #4466ff; color: #fff; }
+  .btn-danger    { background: #882233; color: #fcc; }
+  .btn-success   { background: #226633; color: #cfc; }
+  .btn-sm        { padding: 5px 10px; font-size: .8rem; }
+  .badge-level   { padding: 2px 7px; border-radius: 4px; font-size: .75rem; font-weight: 700;
+    background: #1a2040; color: #88a; margin-left: 6px; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+  th { text-align: left; color: #778; font-size: .75rem; text-transform: uppercase;
+    letter-spacing: .04em; padding: 8px 10px; border-bottom: 1px solid #223; }
+  td { padding: 9px 10px; border-bottom: 1px solid #1a1c2e; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #131525; }
+
+  /* ── Progress bar ── */
+  .prog-wrap { background: #1a1c2e; border-radius: 4px; height: 8px; min-width: 80px; overflow: hidden; }
+  .prog-fill  { height: 100%; border-radius: 4px; background: linear-gradient(90deg,#4466ff,#44dd88); }
+
+  /* ── Word list editor ── */
+  .word-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .word-chip  { background: #1a1c2e; border: 1px solid #334; border-radius: 20px;
+    padding: 5px 12px; font-size: .85rem; display: flex; align-items: center; gap: 8px; }
+  .word-chip .rm { cursor: pointer; color: #f66; font-size: .8rem; line-height: 1;
+    padding: 0 2px; }
+  .word-chip .rm:hover { color: #f88; }
+  .add-word-row { display: flex; gap: 8px; margin-top: 12px; }
+  .add-word-row input, .add-word-row select { padding: 8px 10px; border-radius: 7px;
+    border: 1px solid #334; background: #0c0d1a; color: #fff; font-size: .875rem; }
+  .add-word-row input { flex: 1; }
+
+  /* ── Live monitor ── */
+  .ship-badge { display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    margin-right: 6px; vertical-align: middle; }
+  .lives-row  { letter-spacing: -1px; color: #f88; }
+
+  /* ── Tabs / panels ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .create-list-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .create-list-row input, .create-list-row select { padding: 8px 10px; border-radius: 7px;
+    border: 1px solid #334; background: #0c0d1a; color: #fff; font-size: .875rem; }
+  .create-list-row input { flex: 1; }
+
+  .grade-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .grade-btn { padding: 5px 12px; border-radius: 20px; font-size: .82rem; cursor: pointer;
+    background: #1a1c2e; border: 1px solid #334; color: #99a; transition: all .15s; }
+  .grade-btn:hover { border-color: #4af; color: #fff; }
+  .grade-btn.active { background: #1a2870; border-color: #4af; color: #fff; }
+
+  .list-tab-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .list-tab { padding: 6px 14px; border-radius: 20px; font-size: .85rem; cursor: pointer;
+    background: #1a1c2e; border: 1px solid #334; color: #99a; transition: all .15s; }
+  .list-tab:hover { border-color: #4af; color: #fff; }
+  .list-tab.active { background: #1a2870; border-color: #4af; color: #fff; }
+  .list-tab.is-active-list { border-color: #44dd88; }
+
+  .hint-text { font-size: .8rem; color: #556; margin-top: 4px; }
+
+  .rec-chip { background: #1a2840; border: 1px solid #2266aa; border-radius: 8px;
+    padding: 8px 12px; font-size: .85rem; color: #aac; }
+  .rec-chip strong { color: #4af; }
+</style>
+</head>
+<body>
+
+<!-- ── Auth gate ── -->
+<div id="auth-gate">
+  <div class="gate-card">
+    <h2>🏫 Teacher Dashboard</h2>
+    <input type="password" id="pw-input" placeholder="Teacher password" onkeydown="if(event.key==='Enter')verifyPw()">
+    <button class="btn btn-primary" style="width:100%" onclick="verifyPw()">Enter</button>
+    <p id="pw-err" style="color:#f66;font-size:.85rem;margin-top:8px"></p>
+  </div>
+</div>
+
+<!-- ── Main app (hidden until auth) ── -->
+<div id="app" style="display:none">
+  <nav>
+    <h1>🚀 Spelling Invaders</h1>
+    <ul>
+      <li class="active" onclick="showPanel('live')">📡 Live Game</li>
+      <li onclick="showPanel('students')">👩‍🎓 Students</li>
+      <li onclick="showPanel('wordlists')">📋 Word Lists</li>
+      <li onclick="showPanel('sessions')">📊 Sessions</li>
+    </ul>
+  </nav>
+  <main>
+    <!-- Live panel -->
+    <div id="panel-live" class="panel active">
+      <h2 class="page-title">📡 Live Game Monitor</h2>
+      <div class="section">
+        <h3>Current Game</h3>
+        <div id="live-status">Loading…</div>
+      </div>
+      <div class="section">
+        <h3>Active Players</h3>
+        <table>
+          <thead><tr><th>Player</th><th>Lives</th><th>Score</th><th>Position</th><th>Status</th></tr></thead>
+          <tbody id="live-players"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Students panel -->
+    <div id="panel-students" class="panel">
+      <h2 class="page-title">👩‍🎓 Student Progress</h2>
+      <div class="section">
+        <table>
+          <thead><tr><th>Student</th><th>Words Mastered</th><th>Accuracy</th><th>Total Seen</th></tr></thead>
+          <tbody id="students-table"></tbody>
+        </table>
+      </div>
+      <div class="section" id="student-detail" style="display:none">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          <h3 id="detail-name" style="flex:1"></h3>
+          <button class="btn btn-sm" style="background:#1a1c2e;color:#99a;border:1px solid #334" onclick="document.getElementById('student-detail').style.display='none'">✕ Close</button>
+        </div>
+        <div id="detail-recommendations" style="margin-bottom:16px"></div>
+        <div id="detail-level-summary" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>
+        <div id="detail-words"></div>
+      </div>
+    </div>
+
+    <!-- Word lists panel -->
+    <div id="panel-wordlists" class="panel">
+      <h2 class="page-title">📋 Word Lists</h2>
+      <div class="section">
+        <h3>Create New List</h3>
+        <div class="create-list-row">
+          <input id="new-list-name" placeholder="List name">
+          <select id="new-list-grade">
+            <option value="1">Grade 1</option><option value="2">Grade 2</option>
+            <option value="3">Grade 3</option><option value="4">Grade 4</option>
+            <option value="5">Grade 5</option><option value="6">Grade 6</option>
+          </select>
+          <button class="btn btn-primary" onclick="createList()">Create</button>
+        </div>
+      </div>
+      <div class="section">
+        <h3>All Lists</h3>
+        <p class="hint-text" style="margin-bottom:10px">Browse by grade. Green = active (in progression pool). Toggle weekly curriculum lists on/off as needed.</p>
+        <div class="grade-filter-row" id="grade-filter-btns"></div>
+        <div id="list-table-wrap"></div>
+        <div id="list-editor" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <!-- Sessions panel -->
+    <div id="panel-sessions" class="panel">
+      <h2 class="page-title">📊 Session History</h2>
+      <div class="section">
+        <table>
+          <thead><tr><th>Date</th><th>Players</th><th>Team Score</th><th>Duration</th></tr></thead>
+          <tbody id="sessions-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let teacherPw = '';
+let allLists  = [];
+let activeListId = null;
+
+async function api(path, opts={}) {
+  const r = await fetch('/api/teacher' + path, {
+    ...opts,
+    headers: { 'x-teacher-password': teacherPw, 'Content-Type': 'application/json', ...(opts.headers||{}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!r.ok) throw await r.json();
+  return r.json();
+}
+
+async function verifyPw() {
+  teacherPw = document.getElementById('pw-input').value;
+  try {
+    await api('/verify');
+    document.getElementById('auth-gate').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    loadAll();
+  } catch {
+    document.getElementById('pw-err').textContent = 'Wrong password';
+    teacherPw = '';
+  }
+}
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav li').forEach(l => l.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  document.querySelectorAll('nav li').forEach(l => {
+    if (l.textContent.toLowerCase().includes(name)) l.classList.add('active');
+  });
+  if (name === 'live')       loadLive();
+  if (name === 'students')   loadStudents();
+  if (name === 'wordlists')  loadWordLists();
+  if (name === 'sessions')   loadSessions();
+}
+
+// ── Live ────────────────────────────────────────────────────────────────────
+let liveInterval = null;
+async function loadLive() {
+  clearInterval(liveInterval);
+  await refreshLive();
+  liveInterval = setInterval(refreshLive, 2000);
+}
+
+async function refreshLive() {
+  try {
+    const d = await api('/live');
+    const statusEl = document.getElementById('live-status');
+    const tbody = document.getElementById('live-players');
+    statusEl.innerHTML = `
+      Phase: <strong>${d.phase}</strong> &nbsp;|&nbsp;
+      Team Score: <strong>${d.teamScore}</strong> &nbsp;|&nbsp;
+      Words on screen: <strong>${d.wordCount ?? '—'}</strong>`;
+    tbody.innerHTML = '';
+    for (const p of (d.players || [])) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span class="ship-badge" style="background:${p.color}"></span>${p.username}</td>
+        <td class="lives-row">${'♥'.repeat(Math.max(0,p.lives))}</td>
+        <td>${p.score}</td>
+        <td>x:${Math.round(p.x)}</td>
+        <td>${p.active ? '▶ Active' : '✗ Out'}</td>`;
+      tbody.appendChild(tr);
+    }
+    if (!(d.players||[]).length) tbody.innerHTML = '<tr><td colspan="5" style="color:#556;text-align:center">No players connected</td></tr>';
+  } catch {}
+}
+
+// ── Students ────────────────────────────────────────────────────────────────
+async function loadStudents() {
+  const students = await api('/players');
+  const tbody = document.getElementById('students-table');
+  tbody.innerHTML = '';
+  for (const s of students) {
+    const total    = s.mastery.reduce((a,m) => a + m.times_seen, 0);
+    const correct  = s.mastery.reduce((a,m) => a + m.times_correct, 0);
+    const mastered = s.mastery.filter(m => m.mastered).length;
+    const acc = total > 0 ? Math.round(correct / total * 100) : 0;
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => showStudentDetail(s);
+    tr.innerHTML = `
+      <td>${s.username}</td>
+      <td>${mastered} words</td>
+      <td>
+        <div class="prog-wrap"><div class="prog-fill" style="width:${acc}%"></div></div>
+        <small style="color:#667">${acc}%</small>
+      </td>
+      <td>${total}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (!students.length) tbody.innerHTML = '<tr><td colspan="4" style="color:#556;text-align:center">No students yet</td></tr>';
+}
+
+async function showStudentDetail(student) {
+  document.getElementById('student-detail').style.display = '';
+  document.getElementById('detail-name').textContent = student.username + ' — Word Progress';
+
+  const [mastery, recs] = await Promise.all([
+    api(`/players/${student.id}/mastery`),
+    api(`/players/${student.id}/recommendations`).catch(()=>[]),
+  ]);
+
+  // Recommendations
+  const recEl = document.getElementById('detail-recommendations');
+  if (recs.length) {
+    recEl.innerHTML = `<div style="background:#0d1a2a;border:1px solid #2266aa;border-radius:8px;padding:12px 16px">
+      <div style="font-size:.8rem;color:#4af;font-weight:700;margin-bottom:8px">🎯 ADVANCEMENT RECOMMENDATIONS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${recs.map(r => `<div class="rec-chip">
+          <strong>Grade ${r.grade_level}${r.week_number ? ` Wk ${r.week_number}` : ''}</strong>
+          ${r.theme ? ` — ${r.theme}` : r.name}
+          <span style="color:#4af;margin-left:6px">${r.mastery_pct}% mastered</span>
+        </div>`).join('')}
+      </div>
+      <div style="font-size:.75rem;color:#556;margin-top:8px">Student has mastered ≥80% of these active lists. Consider activating the next level.</div>
+    </div>`;
+  } else {
+    recEl.innerHTML = '';
+  }
+
+  // Level breakdown summary
+  const levels = {};
+  for (const m of mastery) {
+    const lv = m.grade_level;
+    if (!levels[lv]) levels[lv] = { total: 0, mastered: 0 };
+    levels[lv].total++;
+    if (m.mastered) levels[lv].mastered++;
+  }
+  const summaryEl = document.getElementById('detail-level-summary');
+  summaryEl.innerHTML = '';
+  for (const [lv, info] of Object.entries(levels).sort((a,b)=>a[0]-b[0])) {
+    const pct = info.total ? Math.round(info.mastered/info.total*100) : 0;
+    const chip = document.createElement('div');
+    chip.style.cssText = 'background:#1a1c2e;border:1px solid #334;border-radius:8px;padding:8px 12px;min-width:90px;text-align:center';
+    chip.innerHTML = `<div style="font-size:.75rem;color:#778;margin-bottom:4px">Level ${lv}</div>
+      <div style="font-size:1rem;color:#fff;font-weight:700">${info.mastered}/${info.total}</div>
+      <div class="prog-wrap" style="margin-top:4px"><div class="prog-fill" style="width:${pct}%"></div></div>`;
+    summaryEl.appendChild(chip);
+  }
+
+  // Per-word table sorted by grade then seen-count desc
+  const sorted = [...mastery].sort((a,b) => a.grade_level - b.grade_level || b.times_seen - a.times_seen);
+  const div = document.getElementById('detail-words');
+  div.innerHTML = '';
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr>
+    <th>Word</th><th>Level</th><th>List</th>
+    <th>Passes (mastery)</th><th>Shots correct</th><th>Incorrect</th><th>Streak</th><th>Mastered</th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+  for (const m of sorted) {
+    const passPct  = Math.min(100, Math.round(m.correct_passes / 10 * 100));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${m.word}</td>
+      <td>${m.grade_level}</td>
+      <td style="color:#778;font-size:.8rem">${m.list_name}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="prog-wrap" style="min-width:60px"><div class="prog-fill" style="width:${passPct}%"></div></div>
+          <small style="color:#667">${m.correct_passes}/10</small>
+        </div>
+      </td>
+      <td>${m.times_correct}</td>
+      <td style="color:${m.times_incorrect>0?'#f88':'#556'}">${m.times_incorrect}</td>
+      <td>${m.streak}</td>
+      <td>${m.mastered ? '✅' : '—'}</td>`;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  if (!sorted.length) {
+    div.innerHTML = '<p style="color:#556;font-size:.9rem">No words seen yet.</p>';
+  } else {
+    div.appendChild(table);
+  }
+}
+
+// ── Word Lists ───────────────────────────────────────────────────────────────
+let activeGradeFilter = 'all';
+
+async function loadWordLists() {
+  allLists = await api('/word-lists');
+  renderGradeFilter();
+  renderListTable();
+}
+
+function renderGradeFilter() {
+  const wrap = document.getElementById('grade-filter-btns');
+  wrap.innerHTML = '';
+  const grades = [...new Set(allLists.map(l => l.grade_level))].sort((a,b)=>a-b);
+  const filters = ['all', ...grades, 'custom'];
+  for (const f of filters) {
+    const btn = document.createElement('div');
+    btn.className = 'grade-btn' + (f === activeGradeFilter ? ' active' : '');
+    btn.textContent = f === 'all' ? 'All' : f === 'custom' ? 'Custom' : `Grade ${f}`;
+    btn.onclick = () => { activeGradeFilter = f; renderGradeFilter(); renderListTable(); };
+    wrap.appendChild(btn);
+  }
+}
+
+function renderListTable() {
+  const wrap = document.getElementById('list-table-wrap');
+  let filtered = allLists;
+  if (activeGradeFilter === 'custom') {
+    filtered = allLists.filter(l => l.week_number == null);
+  } else if (activeGradeFilter !== 'all') {
+    filtered = allLists.filter(l => l.grade_level === activeGradeFilter);
+  }
+  if (!filtered.length) { wrap.innerHTML = '<p style="color:#556;font-size:.9rem">No lists in this category.</p>'; return; }
+
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr>
+    <th>List / Theme</th><th>Grade</th><th>Week</th><th>Words</th><th>Status</th><th></th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+  for (const l of filtered) {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => { selectList(l.id); document.getElementById('list-editor').scrollIntoView({behavior:'smooth'}); };
+    const statusDot = l.active
+      ? '<span style="color:#44dd88">● Active</span>'
+      : '<span style="color:#445">○ Inactive</span>';
+    const toggleBtn = l.active
+      ? `<button class="btn btn-sm" style="background:#334;color:#fcc;border:1px solid #664" onclick="event.stopPropagation();toggleList(${l.id},false)">Deactivate</button>`
+      : `<button class="btn btn-success btn-sm" onclick="event.stopPropagation();toggleList(${l.id},true)">Activate</button>`;
+    tr.innerHTML = `
+      <td>${l.theme || l.name}</td>
+      <td>${l.grade_level}</td>
+      <td style="color:#778">${l.week_number ?? '—'}</td>
+      <td>${(l.words||[]).length}</td>
+      <td>${statusDot}</td>
+      <td>${toggleBtn}</td>`;
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.innerHTML = '';
+  wrap.appendChild(table);
+}
+
+function selectList(id) {
+  activeListId = id;
+  renderListEditor(id);
+}
+
+function renderListEditor(id) {
+  const list = allLists.find(l => l.id === id);
+  if (!list) return;
+  const div = document.getElementById('list-editor');
+  const isActive = list.active;
+  const toggleBtn = isActive
+    ? `<button class="btn btn-sm" style="background:#334;color:#fcc;border:1px solid #664" onclick="toggleList(${list.id},false)">Deactivate</button>`
+    : `<button class="btn btn-success btn-sm" onclick="toggleList(${list.id},true)">Activate</button>`;
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+      <strong style="color:#fff">${list.name}</strong>
+      <span class="badge-level">Grade ${list.grade_level}</span>
+      ${isActive ? '<span style="color:#44dd88;font-size:.85rem">● Active (in progression)</span>' : '<span style="color:#556;font-size:.85rem">○ Inactive</span>'}
+      ${toggleBtn}
+      <button class="btn btn-danger btn-sm" onclick="deleteList(${list.id})" style="margin-left:auto">Delete List</button>
+    </div>
+    <div class="word-grid" id="word-chips-${id}"></div>
+    <div class="add-word-row">
+      <input id="new-word-${id}" placeholder="Add word…" onkeydown="if(event.key==='Enter')addWord(${id})">
+      <select id="new-word-lvl-${id}">
+        ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<option value="${n}">Level ${n}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="addWord(${id})">Add</button>
+    </div>`;
+  renderWordChips(list);
+}
+
+function renderWordChips(list) {
+  const div = document.getElementById('word-chips-'+list.id);
+  if (!div) return;
+  div.innerHTML = '';
+  for (const w of (list.words || [])) {
+    const chip = document.createElement('div');
+    chip.className = 'word-chip';
+    chip.innerHTML = `${w.word}<span class="badge-level">${w.grade_level}</span>
+      <span class="rm" title="Remove" onclick="removeWord(${list.id},${w.id})">✕</span>`;
+    div.appendChild(chip);
+  }
+  if (!list.words?.length) div.innerHTML = '<span style="color:#556;font-size:.85rem">No words yet</span>';
+}
+
+async function createList() {
+  const name = document.getElementById('new-list-name').value.trim();
+  const lvl  = Number(document.getElementById('new-list-grade').value);
+  if (!name) return;
+  await api('/word-lists', { method:'POST', body:{name, grade_level:lvl} });
+  document.getElementById('new-list-name').value = '';
+  await loadWordLists();
+}
+
+async function toggleList(id, active) {
+  await api(`/word-lists/${id}/activate`, { method:'POST', body:{ active } });
+  await loadWordLists();
+  selectList(id);
+}
+
+async function deleteList(id) {
+  if (!confirm('Delete this word list?')) return;
+  await api(`/word-lists/${id}`, { method:'DELETE' });
+  await loadWordLists();
+}
+
+async function addWord(listId) {
+  const input = document.getElementById('new-word-'+listId);
+  const word  = input.value.trim();
+  const lvl   = Number(document.getElementById('new-word-lvl-'+listId).value);
+  if (!word) return;
+  await api(`/word-lists/${listId}/words`, { method:'POST', body:{word, grade_level:lvl} });
+  input.value = '';
+  await loadWordLists();
+  selectList(listId);
+}
+
+async function removeWord(listId, wordId) {
+  await api(`/word-lists/${listId}/words/${wordId}`, { method:'DELETE' });
+  await loadWordLists();
+  selectList(listId);
+}
+
+// ── Sessions ─────────────────────────────────────────────────────────────────
+async function loadSessions() {
+  const sessions = await api('/sessions');
+  const tbody = document.getElementById('sessions-table');
+  tbody.innerHTML = '';
+  for (const s of sessions) {
+    const started  = new Date(s.started_at * 1000);
+    const duration = s.ended_at ? Math.round((s.ended_at - s.started_at) / 60) + ' min' : 'In progress';
+    const players  = JSON.parse(s.player_ids || '[]').length;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${started.toLocaleDateString()} ${started.toLocaleTimeString()}</td>
+      <td>${players}</td>
+      <td>${s.team_score}</td>
+      <td>${duration}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (!sessions.length) tbody.innerHTML = '<tr><td colspan="4" style="color:#556;text-align:center">No sessions yet</td></tr>';
+}
+
+async function loadAll() {
+  allLists = await api('/word-lists').catch(()=>[]);
+  loadLive();
+}
+
+document.getElementById('pw-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') verifyPw();
+});
+</script>
+</body>
+</html>
