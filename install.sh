@@ -54,10 +54,11 @@ echo "==> Installing npm dependencies"
 ( cd "$INSTALL_DIR" && npm install --omit=dev --no-audit --no-fund )
 
 # ── Retire the old per-game services BEFORE migrating, so the DB is quiescent ─
+# Disable unconditionally; disabling a non-existent unit is a harmless no-op.
 for old in math-gator gator-math spelling-game spelling-sniper; do
-  if systemctl list-unit-files 2>/dev/null | grep -q "^$old.service"; then
+  if systemctl cat "$old.service" >/dev/null 2>&1; then
     echo "==> Disabling old service: $old"
-    systemctl disable --now "$old.service" 2>/dev/null || true
+    systemctl disable --now "$old.service" >/dev/null 2>&1 || true
   fi
 done
 
