@@ -34,8 +34,13 @@ const KEY_LEVELS = [
   { name: 'Punctuation',        keys: [',','.',';',"'",'/','a','s','l','k'],   newKeys: [',','.',"'",'/'] },
 ];
 
-const SEGMENTS_PER_LAP = 18;   // letters in a loop track
 const KEY_LEVEL_COUNT  = KEY_LEVELS.length;
+
+// Tracks get longer (more letters) as levels advance, so later drills are a
+// bigger, more complex run rather than a quick single loop.
+function trackLength(levelNum) {
+  return Math.min(16 + (levelNum - 1) * 4, 48);
+}
 
 // Deterministic PRNG (mulberry32) so all players on a level — and ghosts — get
 // the identical track layout.
@@ -55,7 +60,8 @@ function trackForLevel(levelNum) {
   for (const k of lvl.newKeys) { pool.push(k); pool.push(k); }   // extra weight
   const segs = [];
   let last = null;
-  for (let i = 0; i < SEGMENTS_PER_LAP; i++) {
+  const len = trackLength(levelNum);
+  for (let i = 0; i < len; i++) {
     let c, guard = 0;
     do { c = pool[Math.floor(r() * pool.length)]; } while (c === last && ++guard < 8);
     segs.push(c); last = c;
@@ -66,11 +72,11 @@ function trackForLevel(levelNum) {
 function levelInfo(levelNum) {
   const lvl = KEY_LEVELS[levelNum - 1];
   if (!lvl) return null;
-  return { level: levelNum, name: lvl.name, type: 'keys', keys: lvl.keys, newKeys: lvl.newKeys, segments: SEGMENTS_PER_LAP };
+  return { level: levelNum, name: lvl.name, type: 'keys', keys: lvl.keys, newKeys: lvl.newKeys, segments: trackLength(levelNum) };
 }
 
 module.exports = {
-  FINGER, KEY_LEVELS, KEY_LEVEL_COUNT, SEGMENTS_PER_LAP,
+  FINGER, KEY_LEVELS, KEY_LEVEL_COUNT, trackLength,
   trackForLevel, levelInfo,
   // Level numbers 1..KEY_LEVEL_COUNT are key drills; KEY_LEVEL_COUNT+1 is story mode.
   STORY_LEVEL: KEY_LEVEL_COUNT + 1,

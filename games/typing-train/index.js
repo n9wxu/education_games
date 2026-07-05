@@ -27,14 +27,13 @@ module.exports = function createTypingTrain({ base = '/typing', io }) {
   // ─── Live presence: level number → Map(socketId → peer) ─────────────────────
   const rooms = new Map();
   const roomOf = (lvl) => { if (!rooms.has(lvl)) rooms.set(lvl, new Map()); return rooms.get(lvl); };
-  const peersInLevel = (lvl) => Array.from(roomOf(lvl).values()).map(p => ({ id: p.socketId, username: p.username, color: p.color, seg: p.seg, frac: p.frac, wpm: p.wpm }));
+  const peersInLevel = (lvl) => Array.from(roomOf(lvl).values()).map(p => ({ id: p.socketId, username: p.username, color: p.color, prog: p.prog, wpm: p.wpm }));
 
   // ─── REST ────────────────────────────────────────────────────────────────────
   router.get('/api/levels', (req, res) => res.json({
     finger: levels.FINGER,
     keyLevelCount: levels.KEY_LEVEL_COUNT,
     storyLevel: levels.STORY_LEVEL,
-    segmentsPerLap: levels.SEGMENTS_PER_LAP,
     list: Array.from({ length: levels.KEY_LEVEL_COUNT }, (_, i) => levels.levelInfo(i + 1)),
   }));
 
@@ -62,6 +61,9 @@ module.exports = function createTypingTrain({ base = '/typing', io }) {
   });
 
   router.get('/api/stories', requireAuth, (req, res) => res.json(db.typActiveStories()));
+  // Where the reader left off in a given story (paragraph index).
+  router.get('/api/book/:storyId', requireAuth, (req, res) =>
+    res.json({ paraIndex: db.typGetBookPos(req.player.id, Number(req.params.storyId)) }));
   router.get('/api/story/:id', requireAuth, (req, res) => {
     const s = db.typGetStory(Number(req.params.id));
     if (!s || !s.active) return res.status(404).json({ error: 'Not found' });
@@ -79,24 +81,26 @@ module.exports = function createTypingTrain({ base = '/typing', io }) {
       leave();
       curLevel = Number(level) || 1;
       const room = roomOf(curLevel);
-      room.set(socket.id, { socketId: socket.id, username: player.username, color, seg: 0, frac: 0, wpm: 0 });
+      room.set(socket.id, { socketId: socket.id, username: player.username, color, prog: 0, wpm: 0 });
       socket.join('lvl:' + curLevel);
       socket.emit('joined', { color, username: player.username, level: curLevel, peers: peersInLevel(curLevel).filter(p => p.id !== socket.id) });
-      socket.to('lvl:' + curLevel).emit('peerJoined', { id: socket.id, username: player.username, color, seg: 0, frac: 0, wpm: 0 });
+      socket.to('lvl:' + curLevel).emit('peerJoined', { id: socket.id, username: player.username, color, prog: 0, wpm: 0 });
     });
 
-    socket.on('pos', ({ seg, frac, wpm }) => {
+    socket.on('pos', ({ prog, wpm }) => {
       if (curLevel == null) return;
       const me = roomOf(curLevel).get(socket.id);
       if (!me) return;
-      me.seg = seg | 0; me.frac = +frac || 0; me.wpm = +wpm || 0;
-      socket.to('lvl:' + curLevel).emit('peerPos', { id: socket.id, seg: me.seg, frac: me.frac, wpm: me.wpm });
+      me.prog = +prog || 0; me.wpm = +wpm || 0;
+      socket.to('lvl:' + curLevel).emit('peerPos', { id: socket.id, prog: me.prog, wpm: me.wpm });
     });
 
     // Lap / passage complete → persist stats, record lap, maybe unlock next level.
-    socket.on('lap', ({ level, lapMs, splits, perKey, correct, incorrect, storyId }) => {
+    socket.on('lap', ({ level, lapMs, splits, perKey, correct, incorrect, storyId, paraIndex }) => {
       if (!player) return;
       const lvl = Number(level) || curLevel || 1;
+      // Persist the reader's position in the book (next paragraph to type).
+      if (storyId && paraIndex != null) db.typSetBookPos(player.id, Number(storyId), Number(paraIndex));
       const corr = correct | 0, incorr = incorrect | 0;
       const total = corr + incorr;
       const accuracy = total ? corr / total : 0;
@@ -134,7 +138,7 @@ module.exports = function createTypingTrain({ base = '/typing', io }) {
   // ─── Teacher hooks ──────────────────────────────────────────────────────────
   function getLive() {
     const byLevel = {};
-    for (const [lvl, room] of rooms) if (room.size) byLevel[lvl] = Array.from(room.values()).map(p => ({ username: p.username, wpm: p.wpm, seg: p.seg }));
+    for (const [lvl, room] of rooms) if (room.size) byLevel[lvl] = Array.from(room.values()).map(p => ({ username: p.username, wpm: p.wpm, prog: Math.round((p.prog||0)*100) }));
     return { levels: byLevel, playing: Array.from(rooms.values()).reduce((n, r) => n + r.size, 0) };
   }
   function kickPlayer(dbId, reason) {

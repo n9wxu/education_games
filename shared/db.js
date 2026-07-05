@@ -153,6 +153,13 @@ db.exec(`
     builtin     INTEGER NOT NULL DEFAULT 0,
     created_at  INTEGER DEFAULT (unixepoch())
   );
+  CREATE TABLE IF NOT EXISTS typing_book_progress (
+    player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    story_id   INTEGER NOT NULL REFERENCES typing_stories(id) ON DELETE CASCADE,
+    para_index INTEGER NOT NULL DEFAULT 0,   -- paragraph the reader is up to
+    updated_at INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (player_id, story_id)
+  );
 `);
 
 // Idempotent migrations for DBs created by older game versions
@@ -312,6 +319,11 @@ const q = {
   typInsertStory:     db.prepare('INSERT INTO typing_stories (title, author, source, grade_level, body, builtin) VALUES (?, ?, ?, ?, ?, ?)'),
   typToggleStory:     db.prepare('UPDATE typing_stories SET active = ? WHERE id = ?'),
   typDeleteStory:     db.prepare('DELETE FROM typing_stories WHERE id = ?'),
+  // Book position (resume where the reader left off)
+  typGetBook:  db.prepare('SELECT para_index FROM typing_book_progress WHERE player_id = ? AND story_id = ?'),
+  typSetBook:  db.prepare(`INSERT INTO typing_book_progress (player_id, story_id, para_index) VALUES (?, ?, ?)
+    ON CONFLICT(player_id, story_id) DO UPDATE SET para_index = excluded.para_index, updated_at = unixepoch()`),
+  typDelBook:  db.prepare('DELETE FROM typing_book_progress WHERE player_id = ?'),
 };
 
 function createToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -377,6 +389,7 @@ const deletePlayer = db.transaction(pid => {
   q.typDelProgress.run(pid);
   q.typDelKeyStats.run(pid);
   q.typDelLaps.run(pid);
+  q.typDelBook.run(pid);
   q.deletePlayer.run(pid);
 });
 
@@ -445,6 +458,8 @@ function typSeedStory(title, author, source, grade, body) {
 }
 function typToggleStory(id, active) { q.typToggleStory.run(active ? 1 : 0, id); }
 function typDeleteStory(id)         { q.typDeleteStory.run(id); }
+function typGetBookPos(pid, sid)    { const r = q.typGetBook.get(pid, sid); return r ? r.para_index : 0; }
+function typSetBookPos(pid, sid, i) { q.typSetBook.run(pid, sid, i | 0); }
 
 module.exports = {
   // accounts / auth
@@ -464,7 +479,7 @@ module.exports = {
   typGetProgress, typUnlockLevel, typGetKeyStats, typRecordKeyStats,
   typRecordLap, typBestLap, typRecentLaps, typLevelLeaderboard,
   typAllStories, typActiveStories, typGetStory, typAddStory, typSeedStory,
-  typToggleStory, typDeleteStory,
+  typToggleStory, typDeleteStory, typGetBookPos, typSetBookPos,
   // raw handle (for unified teacher aggregate queries if needed)
   _db: db,
 };
