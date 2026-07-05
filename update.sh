@@ -26,7 +26,7 @@ fi
 echo "==> Installing dependencies"
 npm install --omit=dev --no-audit --no-fund
 
-if command -v systemctl >/dev/null && systemctl list-unit-files | grep -q "^$SERVICE.service"; then
+if command -v systemctl >/dev/null && systemctl cat "$SERVICE.service" >/dev/null 2>&1; then
   echo "==> Restarting $SERVICE"
   systemctl restart "$SERVICE.service"
   echo "✅ Updated and restarted."
