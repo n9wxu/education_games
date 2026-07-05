@@ -19,7 +19,7 @@ const KB_LAYOUT = ['1234567890-=', 'qwertyuiop[]', "asdfghjkl;'", 'zxcvbnm,./', 
 const FINGER_NAME = { Lpinky:'left pinky', Lring:'left ring', Lmid:'left middle', Lindex:'left index',
   Rindex:'right index', Rmid:'right middle', Rring:'right ring', Rpinky:'right pinky', Thumb:'thumb' };
 
-const LAPS = 3, PASS_ACC = 0.90, PASS_WPM = 80;   // level = 3 laps; pass thresholds
+const LAPS = 3, PASS_ACC = 0.90, PASS_WPM = 30;   // level = 3 laps; pass thresholds
 const LEAD = 6;          // letters of runway between the loco and the next letter
 const FLOOR_LPS = 0.6;   // minimum approach speed (letters/sec) so the train always creeps
 const XLOCO = 230, STEP = 54;   // strip geometry
@@ -206,7 +206,7 @@ function finishLevel(acc, wpm) {
   $('#doneTitle').textContent = passed ? '🎉 Level cleared!' : 'Keep practicing!';
   $('#doneBody').innerHTML =
     `<div>Accuracy: <b>${Math.round(acc*100)}%</b> ${acc>PASS_ACC?'✅':'&nbsp;— need &gt; 90%'}</div>
-     <div style="margin-top:4px">Speed: <b>${Math.round(wpm)} wpm</b> ${wpm>PASS_WPM?'✅':'&nbsp;— need &gt; 80 wpm'}</div>
+     <div style="margin-top:4px">Speed: <b>${Math.round(wpm)} wpm</b> ${wpm>PASS_WPM?'✅':'&nbsp;— need &gt; '+PASS_WPM+' wpm'}</div>
      <div class="muted" style="margin-top:10px">${passed?'Next level unlocked!':'Meet both targets over the 3 laps to unlock the next level.'}</div>`;
   const next = $('#doneNext');
   next.style.display = passed ? '' : 'none';
