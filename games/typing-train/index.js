@@ -13,7 +13,8 @@ const { requireAuth, playerFromSocket } = require('../../shared/auth');
 const levels  = require('./levels');
 const SEED_STORIES = require('./seedStories');
 
-const ACCURACY_TO_ADVANCE = 0.9;   // min lap accuracy to unlock the next level
+const PASS_ACCURACY = 0.9;    // min run accuracy to unlock the next level
+const PASS_WPM      = 80;     // min run speed (wpm) to unlock the next level
 const COLORS = ['#ffcc33','#44aaff','#ff5566','#44dd88','#cc66ff','#ff8844','#33d0d0','#ff77bb'];
 
 module.exports = function createTypingTrain({ base = '/typing', io }) {
@@ -96,7 +97,7 @@ module.exports = function createTypingTrain({ base = '/typing', io }) {
     });
 
     // Lap / passage complete → persist stats, record lap, maybe unlock next level.
-    socket.on('lap', ({ level, lapMs, splits, perKey, correct, incorrect, storyId, paraIndex }) => {
+    socket.on('lap', ({ level, lapMs, splits, perKey, correct, incorrect, storyId, paraIndex, final, runWpm, runAcc }) => {
       if (!player) return;
       const lvl = Number(level) || curLevel || 1;
       // Persist the reader's position in the book (next paragraph to type).
@@ -104,22 +105,23 @@ module.exports = function createTypingTrain({ base = '/typing', io }) {
       const corr = correct | 0, incorr = incorrect | 0;
       const total = corr + incorr;
       const accuracy = total ? corr / total : 0;
-      const chars = corr;                                   // correct keystrokes
       const minutes = (lapMs || 1) / 60000;
-      const wpm = minutes > 0 ? (chars / 5) / minutes : 0;
+      const wpm = minutes > 0 ? (corr / 5) / minutes : 0;
 
       if (perKey && typeof perKey === 'object') db.typRecordKeyStats(player.id, perKey);
       db.typRecordLap(player.id, lvl, storyId || null, lapMs || 0, wpm, accuracy, splits || []);
 
+      // Unlock the next level only after a full 3-lap run that clears BOTH targets.
       let unlocked = db.typGetProgress(player.id).level;
-      if (lvl <= levels.KEY_LEVEL_COUNT && accuracy >= ACCURACY_TO_ADVANCE && lvl >= unlocked) {
+      if (final && lvl <= levels.KEY_LEVEL_COUNT && lvl >= unlocked
+          && (runAcc ?? 0) > PASS_ACCURACY && (runWpm ?? 0) > PASS_WPM) {
         unlocked = Math.min(lvl + 1, levels.STORY_LEVEL);
         db.typUnlockLevel(player.id, unlocked);
       }
       const best = db.typBestLap(player.id, lvl);
       socket.emit('lapSaved', {
         lapMs, wpm: Math.round(wpm), accuracy: Math.round(accuracy * 100),
-        unlockedLevel: unlocked,
+        unlockedLevel: unlocked, passed: !!(final && unlocked > lvl),
         best: best ? { lapMs: best.lap_ms, wpm: Math.round(best.wpm || 0) } : null,
       });
     });
