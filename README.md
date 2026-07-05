@@ -8,6 +8,7 @@ A collection of educational web games for kids, served from a **single port** wi
 | 🐊 **Math Gator** | `/math` | Feed the gator correct answers to +, −, ×, ÷ facts. |
 | 👾 **Spelling Invaders** | `/spelling` | Rescue the correctly-spelled words; don't shoot the misspellings. |
 | 🎯 **Spelling Sniper** | `/sniper` | Snipe the misspelled words, then type the correct spelling. |
+| 🚂 **Typing Train** | `/typing` | Drive a steam train by touch-typing — learn the keys on loop tracks, then type real stories. |
 
 - **One login works everywhere** — accounts and sessions are shared across all three games.
 - **One teacher dashboard** at `/teacher` — manage players, math focus facts, spelling
@@ -100,6 +101,7 @@ server.js                 one Express app + HTTP server on ONE port
 ├── /math      → games/math/                  Math Gator
 ├── /spelling  → games/spelling-invaders/     Spelling Invaders
 ├── /sniper    → games/spelling-sniper/       Spelling Sniper
+├── /typing    → games/typing-train/          Typing Train
 └── /teacher   → portal/teacher.js + teacher.html   unified dashboard
 
 shared/db.js              one self-initializing SQLite schema (accounts + all game stats)

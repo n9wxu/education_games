@@ -23,6 +23,7 @@ const GAMES = [
   { key: 'math',     base: '/math',     title: 'Math Gator',        factory: require('./games/math') },
   { key: 'spelling', base: '/spelling', title: 'Spelling Invaders', factory: require('./games/spelling-invaders') },
   { key: 'sniper',   base: '/sniper',   title: 'Spelling Sniper',   factory: require('./games/spelling-sniper') },
+  { key: 'typing',   base: '/typing',   title: 'Typing Train',      factory: require('./games/typing-train') },
 ];
 
 const mounted = {};   // key -> { router, io, kickPlayer, pushFocus, ... }

@@ -115,6 +115,44 @@ db.exec(`
     correct_shot  INTEGER,
     ts            INTEGER DEFAULT (unixepoch())
   );
+
+  -- ── Typing Train ──────────────────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS typing_progress (
+    player_id   INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+    level       INTEGER NOT NULL DEFAULT 1,   -- highest level unlocked
+    updated_at  INTEGER DEFAULT (unixepoch())
+  );
+  CREATE TABLE IF NOT EXISTS typing_key_stats (
+    player_id     INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    key_char      TEXT NOT NULL,
+    presented     INTEGER DEFAULT 0,
+    correct       INTEGER DEFAULT 0,
+    incorrect     INTEGER DEFAULT 0,
+    total_time_ms INTEGER DEFAULT 0,          -- summed time-to-press for correct hits
+    PRIMARY KEY (player_id, key_char)
+  );
+  CREATE TABLE IF NOT EXISTS typing_laps (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id  INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    level      INTEGER NOT NULL,
+    story_id   INTEGER REFERENCES typing_stories(id) ON DELETE SET NULL,
+    lap_ms     INTEGER NOT NULL,
+    wpm        REAL,
+    accuracy   REAL,
+    splits     TEXT DEFAULT '[]',            -- cumulative ms per segment (ghost replay)
+    ts         INTEGER DEFAULT (unixepoch())
+  );
+  CREATE TABLE IF NOT EXISTS typing_stories (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT NOT NULL,
+    author      TEXT,
+    source      TEXT,
+    grade_level INTEGER NOT NULL DEFAULT 3,
+    body        TEXT NOT NULL,
+    active      INTEGER NOT NULL DEFAULT 1,
+    builtin     INTEGER NOT NULL DEFAULT 0,
+    created_at  INTEGER DEFAULT (unixepoch())
+  );
 `);
 
 // Idempotent migrations for DBs created by older game versions
@@ -234,6 +272,46 @@ const q = {
     INSERT INTO spell_events (session_id, player_id, word, displayed_as, is_misspelled, shot_by, correct_shot)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `),
+
+  // Typing Train
+  typGetProgress:  db.prepare('SELECT * FROM typing_progress WHERE player_id = ?'),
+  typInitProgress: db.prepare('INSERT OR IGNORE INTO typing_progress (player_id) VALUES (?)'),
+  typSetLevel:     db.prepare('UPDATE typing_progress SET level = MAX(level, ?), updated_at = unixepoch() WHERE player_id = ?'),
+  typKeyStats:     db.prepare('SELECT * FROM typing_key_stats WHERE player_id = ? ORDER BY key_char'),
+  typUpsertKey:    db.prepare(`
+    INSERT INTO typing_key_stats (player_id, key_char, presented, correct, incorrect, total_time_ms)
+    VALUES (@pid, @key, @presented, @correct, @incorrect, @time)
+    ON CONFLICT(player_id, key_char) DO UPDATE SET
+      presented     = presented     + @presented,
+      correct       = correct       + @correct,
+      incorrect     = incorrect     + @incorrect,
+      total_time_ms = total_time_ms + @time
+  `),
+  typInsertLap:    db.prepare(`
+    INSERT INTO typing_laps (player_id, level, story_id, lap_ms, wpm, accuracy, splits)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `),
+  typBestLap:      db.prepare(`
+    SELECT * FROM typing_laps WHERE player_id = ? AND level = ?
+    ORDER BY lap_ms ASC LIMIT 1
+  `),
+  typRecentLaps:   db.prepare('SELECT * FROM typing_laps WHERE player_id = ? ORDER BY ts DESC LIMIT 20'),
+  typLevelBest:    db.prepare(`
+    SELECT p.username, MIN(l.lap_ms) AS best_ms, MAX(l.wpm) AS best_wpm
+    FROM typing_laps l JOIN players p ON p.id = l.player_id
+    WHERE l.level = ? GROUP BY l.player_id ORDER BY best_ms ASC LIMIT 20
+  `),
+  typDelProgress:  db.prepare('DELETE FROM typing_progress WHERE player_id = ?'),
+  typDelKeyStats:  db.prepare('DELETE FROM typing_key_stats WHERE player_id = ?'),
+  typDelLaps:      db.prepare('DELETE FROM typing_laps WHERE player_id = ?'),
+  // Stories
+  typAllStories:      db.prepare('SELECT id, title, author, source, grade_level, active, builtin, created_at, length(body) AS length FROM typing_stories ORDER BY grade_level, title'),
+  typActiveStories:   db.prepare('SELECT id, title, author, source, grade_level FROM typing_stories WHERE active = 1 ORDER BY grade_level, title'),
+  typGetStory:        db.prepare('SELECT * FROM typing_stories WHERE id = ?'),
+  typStoryByTitle:    db.prepare('SELECT id FROM typing_stories WHERE title = ? AND builtin = 1'),
+  typInsertStory:     db.prepare('INSERT INTO typing_stories (title, author, source, grade_level, body, builtin) VALUES (?, ?, ?, ?, ?, ?)'),
+  typToggleStory:     db.prepare('UPDATE typing_stories SET active = ? WHERE id = ?'),
+  typDeleteStory:     db.prepare('DELETE FROM typing_stories WHERE id = ?'),
 };
 
 function createToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -296,6 +374,9 @@ const deletePlayer = db.transaction(pid => {
   q.deleteFactStats.run(pid);
   q.clearFocusFacts.run(pid);
   q.deleteMastery.run(pid);
+  q.typDelProgress.run(pid);
+  q.typDelKeyStats.run(pid);
+  q.typDelLaps.run(pid);
   q.deletePlayer.run(pid);
 });
 
@@ -333,6 +414,38 @@ function logEvent(sid, pid, word, displayedAs, isMisspelled, shotBy, correctShot
     correctShot == null ? null : (correctShot ? 1 : 0));
 }
 
+// ─── Typing Train ────────────────────────────────────────────────────────────
+function typGetProgress(pid) {
+  q.typInitProgress.run(pid);
+  return q.typGetProgress.get(pid) || { player_id: pid, level: 1 };
+}
+function typUnlockLevel(pid, level) { q.typInitProgress.run(pid); q.typSetLevel.run(level, pid); }
+function typGetKeyStats(pid)        { return q.typKeyStats.all(pid); }
+const typRecordKeyStats = db.transaction((pid, perKey) => {
+  for (const [key, s] of Object.entries(perKey)) {
+    q.typUpsertKey.run({ pid, key, presented: s.presented|0, correct: s.correct|0, incorrect: s.incorrect|0, time: s.time|0 });
+  }
+});
+function typRecordLap(pid, level, storyId, lapMs, wpm, accuracy, splits) {
+  return q.typInsertLap.run(pid, level, storyId ?? null, Math.round(lapMs), wpm ?? null, accuracy ?? null, JSON.stringify(splits || [])).lastInsertRowid;
+}
+function typBestLap(pid, level)   { return q.typBestLap.get(pid, level); }
+function typRecentLaps(pid)       { return q.typRecentLaps.all(pid); }
+function typLevelLeaderboard(lvl) { return q.typLevelBest.all(lvl); }
+
+function typAllStories()          { return q.typAllStories.all(); }
+function typActiveStories()       { return q.typActiveStories.all(); }
+function typGetStory(id)          { return q.typGetStory.get(id); }
+function typAddStory(title, author, source, grade, body, builtin) {
+  return q.typInsertStory.run(title, author ?? null, source ?? null, grade || 3, body, builtin ? 1 : 0).lastInsertRowid;
+}
+function typSeedStory(title, author, source, grade, body) {
+  if (q.typStoryByTitle.get(title)) return null;   // already seeded
+  return typAddStory(title, author, source, grade, body, 1);
+}
+function typToggleStory(id, active) { q.typToggleStory.run(active ? 1 : 0, id); }
+function typDeleteStory(id)         { q.typDeleteStory.run(id); }
+
 module.exports = {
   // accounts / auth
   register, findPlayer, getPlayerById, getPlayer: getPlayerById, allPlayers,
@@ -347,6 +460,11 @@ module.exports = {
   touchMastery, recordCorrect, recordPassedCorrect, recordIncorrect,
   masteredWordIds, staleMasteredWord, allMastery, getMastery, masteryWithWords,
   startSession, closeSession, allSessions, logEvent,
+  // typing train
+  typGetProgress, typUnlockLevel, typGetKeyStats, typRecordKeyStats,
+  typRecordLap, typBestLap, typRecentLaps, typLevelLeaderboard,
+  typAllStories, typActiveStories, typGetStory, typAddStory, typSeedStory,
+  typToggleStory, typDeleteStory,
   // raw handle (for unified teacher aggregate queries if needed)
   _db: db,
 };

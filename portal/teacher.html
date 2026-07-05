@@ -52,12 +52,14 @@
   <div class="tabs">
     <button class="tab active" data-tab="players" onclick="showTab('players')">Players</button>
     <button class="tab" data-tab="words" onclick="showTab('words')">Word Lists</button>
+    <button class="tab" data-tab="typing" onclick="showTab('typing')">Typing Train</button>
     <button class="tab" data-tab="sessions" onclick="showTab('sessions')">Spelling Sessions</button>
     <button class="tab" data-tab="live" onclick="showTab('live')">Live</button>
   </div>
   <main>
     <div class="panel active" id="panel-players"></div>
     <div class="panel" id="panel-words"></div>
+    <div class="panel" id="panel-typing"></div>
     <div class="panel" id="panel-sessions"></div>
     <div class="panel" id="panel-live"></div>
   </main>
@@ -92,8 +94,77 @@ function showTab(t) {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
   document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-' + t).classList.add('active');
-  ({ players: loadPlayers, words: loadWords, sessions: loadSessions, live: loadLive }[t])();
+  ({ players: loadPlayers, words: loadWords, typing: loadTyping, sessions: loadSessions, live: loadLive }[t])();
 }
+
+// ─── Typing Train ────────────────────────────────────────────────────────────
+async function loadTyping() {
+  const el = document.getElementById('panel-typing');
+  el.innerHTML = '<p class="muted">Loading…</p>';
+  const [players, stories] = await Promise.all([ api('/players'), api('/typing-stories') ]);
+
+  const storyCard = `<div class="card">
+    <h3>Story library</h3>
+    <div class="muted">Stories students can type in Story Mode. Add your own; toggle which are active.</div>
+    <div style="margin:10px 0">
+      ${stories.map(s => `<div class="row" style="border-bottom:1px solid #28324f;padding:6px 0">
+        <span class="pill ${s.active?'active':''}">${s.active?'on':'off'}</span>
+        <b>${esc(s.title)}</b>
+        <span class="muted">${s.author?esc(s.author)+' · ':''}gr ${s.grade_level} · ${s.length} chars ${s.builtin?'· built-in':''}</span>
+        <span style="margin-left:auto" class="row">
+          <button class="act ghost" onclick="toggleStory(${s.id},${s.active?0:1})">${s.active?'Deactivate':'Activate'}</button>
+          ${s.builtin?'':`<button class="act danger" onclick="delStory(${s.id},'${esc(s.title)}')">Delete</button>`}
+        </span></div>`).join('') || '<span class="muted">No stories.</span>'}
+    </div>
+    <details><summary>➕ Add a story</summary>
+      <div style="margin-top:10px">
+        <div class="row"><input id="stTitle" placeholder="Title" style="flex:1">
+          <input id="stAuthor" placeholder="Author (optional)" style="flex:1">
+          <select id="stGrade">${[1,2,3,4,5,6,7,8].map(g=>`<option value="${g}">Grade ${g}</option>`).join('')}</select></div>
+        <textarea id="stBody" placeholder="Paste the story text here…" style="width:100%;height:120px;margin-top:8px;background:#0f1729;color:#e8edf7;border:1px solid #2a3557;border-radius:7px;padding:8px"></textarea>
+        <button class="act" style="margin-top:8px" onclick="addStory()">Save story</button>
+      </div>
+    </details>
+  </div>`;
+
+  const studentCard = `<div class="card"><h3>Student progress</h3>` +
+    (players.length ? players.map(p => `
+      <details style="border-bottom:1px solid #28324f;padding:6px 0" data-pid="${p.id}" ontoggle="if(this.open)loadTypingDetail(${p.id},this)">
+        <summary><b>${esc(p.username)}</b> <span class="muted">#${p.id}</span></summary>
+        <div class="tdetail muted" style="margin:8px 0 4px">Loading…</div>
+      </details>`).join('') : '<span class="muted">No players.</span>') + `</div>`;
+
+  el.innerHTML = storyCard + studentCard;
+}
+async function loadTypingDetail(pid, node) {
+  const box = node.querySelector('.tdetail');
+  const d = await api(`/players/${pid}/typing`);
+  const keys = (d.keyStats||[]).map(k => {
+    const tot = k.correct + k.incorrect;
+    return { key: k.key_char, acc: tot ? k.correct/tot : 1, avg: k.correct ? k.total_time_ms/k.correct : 0, tot };
+  }).filter(k => k.tot >= 3);
+  const worst = [...keys].sort((a,b)=>a.acc-b.acc).slice(0,6).filter(k=>k.acc<1);
+  const slow  = [...keys].sort((a,b)=>b.avg-a.avg).slice(0,6);
+  const laps  = (d.recentLaps||[]).slice(0,5);
+  box.classList.remove('muted');
+  box.innerHTML = `
+    <div>Level reached: <b>${d.progress.level}</b></div>
+    <div style="margin-top:6px">Least accurate keys: ${worst.length ? worst.map(k=>`<span class="chip">${disp(k.key)} ${Math.round(k.acc*100)}%</span>`).join(' ') : '<span class="muted">none — all accurate 👍</span>'}</div>
+    <div style="margin-top:6px">Slowest keys: ${slow.length ? slow.map(k=>`<span class="chip">${disp(k.key)} ${Math.round(k.avg)}ms</span>`).join(' ') : '<span class="muted">no data yet</span>'}</div>
+    <div style="margin-top:6px" class="muted">Recent laps: ${laps.length ? laps.map(l=>`L${l.level} ${(l.lap_ms/1000).toFixed(1)}s/${Math.round(l.wpm||0)}wpm/${Math.round((l.accuracy||0)*100)}%`).join(' · ') : 'none'}</div>`;
+}
+function disp(c){ return c === ' ' ? '␣' : esc(c); }
+async function addStory() {
+  const title = document.getElementById('stTitle').value.trim();
+  const author = document.getElementById('stAuthor').value.trim();
+  const grade_level = Number(document.getElementById('stGrade').value);
+  const body = document.getElementById('stBody').value.trim();
+  if (!title || !body) { alert('Title and text are required'); return; }
+  await api('/typing-stories', { method:'POST', body: JSON.stringify({ title, author, grade_level, body }) });
+  toast('Story added'); loadTyping();
+}
+async function toggleStory(id, active) { await api(`/typing-stories/${id}/activate`, { method:'POST', body: JSON.stringify({ active: !!active }) }); loadTyping(); }
+async function delStory(id, title) { if (!confirm(`Delete story "${title}"?`)) return; await api(`/typing-stories/${id}`, { method:'DELETE' }); loadTyping(); }
 
 // ─── Players ───────────────────────────────────────────────────────────────
 async function loadPlayers() {

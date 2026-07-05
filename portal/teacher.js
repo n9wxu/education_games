@@ -105,6 +105,32 @@ module.exports = function createTeacher(mounted) {
     res.json({ ok: true });
   });
 
+  // ─── Typing Train: per-student progress ─────────────────────────────────────
+  router.get('/api/players/:id/typing', (req, res) => {
+    const pid = Number(req.params.id);
+    res.json({
+      progress:   db.typGetProgress(pid),
+      keyStats:   db.typGetKeyStats(pid),
+      recentLaps: db.typRecentLaps(pid),
+    });
+  });
+
+  // ─── Typing Train: story library ────────────────────────────────────────────
+  router.get('/api/typing-stories', (req, res) => res.json(db.typAllStories()));
+  router.post('/api/typing-stories', (req, res) => {
+    const { title, author, grade_level, body } = req.body || {};
+    if (!title || !body) return res.status(400).json({ error: 'Title and text are required' });
+    res.json({ id: db.typAddStory(String(title).slice(0, 200), author || null, 'teacher', grade_level || 3, String(body), false) });
+  });
+  router.post('/api/typing-stories/:id/activate', (req, res) => {
+    db.typToggleStory(Number(req.params.id), (req.body || {}).active !== false);
+    res.json({ ok: true });
+  });
+  router.delete('/api/typing-stories/:id', (req, res) => {
+    db.typDeleteStory(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
   // ─── Spelling: recent sessions ──────────────────────────────────────────────
   router.get('/api/sessions', (req, res) => res.json(db.allSessions()));
 

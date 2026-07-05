@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typing Train</title>
+<style>
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; background:#0b1020; color:#eaf0ff; overflow:hidden; }
+  #wrap { max-width:940px; margin:0 auto; padding:8px; }
+  header { display:flex; align-items:center; gap:14px; padding:4px 6px; }
+  header h1 { font-size:1.15rem; margin:0; }
+  header .sp { margin-left:auto; }
+  header a { color:#9db4ff; text-decoration:none; font-size:.85rem; }
+  #hud { display:flex; gap:18px; font-size:.95rem; padding:4px 8px; flex-wrap:wrap; align-items:center; }
+  #hud b { color:#ffcc33; }
+  #hud .lvlname { color:#8fa6d8; }
+  canvas { display:block; width:100%; background:#0e1630; border-radius:12px; border:1px solid #26325a; }
+  /* On-screen keyboard */
+  #kb { margin-top:8px; user-select:none; }
+  .krow { display:flex; justify-content:center; gap:5px; margin-bottom:5px; }
+  .key { width:42px; height:42px; border-radius:8px; background:#1b2748; border:1px solid #2c3a63;
+         display:flex; align-items:center; justify-content:center; font-size:.95rem; color:#cdd8f5; position:relative; }
+  .key.wide { width:120px; }
+  .key.next { background:#ffcc33; color:#20160a; box-shadow:0 0 0 3px rgba(255,204,51,.35); font-weight:700; transform:translateY(-1px); }
+  .key.Lpinky{border-bottom:3px solid #ff6b6b}.key.Lring{border-bottom:3px solid #ffa94d}
+  .key.Lmid{border-bottom:3px solid #ffe066}.key.Lindex{border-bottom:3px solid #63e6be}
+  .key.Rindex{border-bottom:3px solid #74c0fc}.key.Rmid{border-bottom:3px solid #b197fc}
+  .key.Rring{border-bottom:3px solid #f783ac}.key.Rpinky{border-bottom:3px solid #ff8787}
+  .key.Thumb{border-bottom:3px solid #ced4da}
+  #fingerHint { text-align:center; font-size:.85rem; color:#8fa6d8; min-height:1.1em; margin-top:2px; }
+  /* overlays */
+  .overlay { position:fixed; inset:0; background:rgba(6,10,24,.92); display:flex; align-items:center; justify-content:center; z-index:20; }
+  .panel { background:#131c38; border:1px solid #2a3a66; border-radius:16px; padding:26px 30px; width:min(440px,92vw); }
+  .panel h2 { margin:0 0 14px; }
+  .panel input { width:100%; padding:11px; margin:7px 0; border-radius:8px; border:1px solid #2c3a63; background:#0b1020; color:#eaf0ff; }
+  .btn { background:#4f7cff; color:#fff; border:none; border-radius:9px; padding:10px 16px; font-size:.95rem; cursor:pointer; }
+  .btn.sec { background:#26325a; }
+  .btn:hover{filter:brightness(1.08)}
+  .err { color:#ff8095; min-height:1em; font-size:.85rem; }
+  .levels { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; max-height:52vh; overflow:auto; margin-top:8px; }
+  .lvl { text-align:left; background:#1a2748; border:1px solid #2c3a63; border-radius:10px; padding:10px 12px; cursor:pointer; color:#eaf0ff; }
+  .lvl:hover:not(:disabled){ border-color:#4f7cff; }
+  .lvl:disabled{ opacity:.4; cursor:not-allowed; }
+  .lvl .n{ font-weight:700; } .lvl .k{ font-size:.78rem; color:#8fa6d8; margin-top:3px; letter-spacing:2px; }
+  .lvl.story{ background:#20304f; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .muted{ color:#8fa6d8; font-size:.85rem; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>🚂 Typing Train</h1>
+    <span id="who" class="muted"></span>
+    <span class="sp"></span>
+    <button class="btn sec" id="menuBtn" style="display:none">Levels</button>
+    <a href="/">← Games</a>
+  </header>
+  <div id="hud">
+    <span class="lvlname" id="hudLevel">—</span>
+    <span>Speed <b id="hudWpm">0</b> wpm</span>
+    <span>Lap <b id="hudLap">0.0</b>s</span>
+    <span>Best <b id="hudBest">—</b></span>
+    <span>Acc <b id="hudAcc">100</b>%</span>
+  </div>
+  <canvas id="c" width="920" height="470"></canvas>
+  <div id="kb"></div>
+  <div id="fingerHint"></div>
+</div>
+
+<!-- Login -->
+<div class="overlay" id="loginOv">
+  <div class="panel">
+    <h2>🚂 Typing Train</h2>
+    <p class="muted">Log in with your Family Games account (works across all games).</p>
+    <input id="u" placeholder="Username" autocomplete="username">
+    <input id="p" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')TT.login()">
+    <div class="row" style="margin-top:8px">
+      <button class="btn" onclick="TT.login()">Log in</button>
+      <button class="btn sec" onclick="TT.register()">Create account</button>
+    </div>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<!-- Level select -->
+<div class="overlay" id="levelOv" style="display:none">
+  <div class="panel">
+    <h2>Choose a level</h2>
+    <div class="muted">Reach 90% accuracy on a level to unlock the next one.</div>
+    <div class="levels" id="levelGrid"></div>
+  </div>
+</div>
+
+<script src="/typing/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
