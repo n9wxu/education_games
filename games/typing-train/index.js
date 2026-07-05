@@ -14,7 +14,7 @@ const levels  = require('./levels');
 const SEED_STORIES = require('./seedStories');
 
 const PASS_ACCURACY = 0.9;    // min run accuracy to unlock the next level
-const PASS_WPM      = 30;     // min run speed (wpm) to unlock the next level
+const PASS_WPM      = 20;     // min run speed (wpm) to unlock the next level
 const COLORS = ['#ffcc33','#44aaff','#ff5566','#44dd88','#cc66ff','#ff8844','#33d0d0','#ff77bb'];
 
 module.exports = function createTypingTrain({ base = '/typing', io }) {

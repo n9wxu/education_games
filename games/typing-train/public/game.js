@@ -19,7 +19,7 @@ const KB_LAYOUT = ['1234567890-=', 'qwertyuiop[]', "asdfghjkl;'", 'zxcvbnm,./', 
 const FINGER_NAME = { Lpinky:'left pinky', Lring:'left ring', Lmid:'left middle', Lindex:'left index',
   Rindex:'right index', Rmid:'right middle', Rring:'right ring', Rpinky:'right pinky', Thumb:'thumb' };
 
-const LAPS = 3, PASS_ACC = 0.90, PASS_WPM = 30;   // level = 3 laps; pass thresholds
+const LAPS = 3, PASS_ACC = 0.90, PASS_WPM = 20;   // level = 3 laps; pass thresholds
 const LEAD = 6;          // letters of runway between the loco and the next letter
 const FLOOR_LPS = 0.6;   // minimum approach speed (letters/sec) so the train always creeps
 const XLOCO = 230, STEP = 54;   // strip geometry
