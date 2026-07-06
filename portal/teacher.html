@@ -53,6 +53,7 @@
     <button class="tab active" data-tab="players" onclick="showTab('players')">Players</button>
     <button class="tab" data-tab="words" onclick="showTab('words')">Word Lists</button>
     <button class="tab" data-tab="typing" onclick="showTab('typing')">Typing Train</button>
+    <button class="tab" data-tab="requests" onclick="showTab('requests')">Game Requests</button>
     <button class="tab" data-tab="sessions" onclick="showTab('sessions')">Spelling Sessions</button>
     <button class="tab" data-tab="live" onclick="showTab('live')">Live</button>
   </div>
@@ -60,6 +61,7 @@
     <div class="panel active" id="panel-players"></div>
     <div class="panel" id="panel-words"></div>
     <div class="panel" id="panel-typing"></div>
+    <div class="panel" id="panel-requests"></div>
     <div class="panel" id="panel-sessions"></div>
     <div class="panel" id="panel-live"></div>
   </main>
@@ -94,8 +96,57 @@ function showTab(t) {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
   document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-' + t).classList.add('active');
-  ({ players: loadPlayers, words: loadWords, typing: loadTyping, sessions: loadSessions, live: loadLive }[t])();
+  ({ players: loadPlayers, words: loadWords, typing: loadTyping, requests: loadRequests, sessions: loadSessions, live: loadLive }[t])();
 }
+
+// ─── Game Requests (from the kids' Game Wizard) ──────────────────────────────
+async function loadRequests() {
+  const el = document.getElementById('panel-requests');
+  el.innerHTML = '<p class="muted">Loading…</p>';
+  const ai = await api('/ai-key');
+  const keyCard = `<div class="card">
+    <h3>🤖 AI Helper (Game Wizard)</h3>
+    <div class="muted">The Game Wizard needs an Anthropic API key to chat with kids.
+      Status: ${ai.set ? `<b style="color:#7fe3a0">on</b> ${ai.source==='env'?'(set in server environment)':'(saved here)'}` : '<b style="color:#ff9db0">off</b>'}.</div>
+    ${ai.editable ? `<div class="row" style="margin-top:10px">
+        <input id="aiKey" type="password" placeholder="Paste Anthropic API key (sk-ant-…)" style="flex:1">
+        <button class="act" onclick="saveKey()">Save &amp; test</button>
+        ${ai.set ? '<button class="act ghost" onclick="clearKey()">Turn off</button>' : ''}
+      </div>
+      <div class="muted" id="aiKeyMsg" style="margin-top:6px"></div>
+      <div class="muted" style="margin-top:4px">Stored in this server's database. Get a key at console.anthropic.com and add API credits.</div>`
+      : '<div class="muted" style="margin-top:6px">Set via the server environment — change it there.</div>'}
+  </div>`;
+  const reqs = await api('/game-requests');
+  if (!reqs.length) { el.innerHTML = keyCard + '<p class="muted">No game ideas submitted yet. Kids can make one at <b>/wizard</b>.</p>'; return; }
+  const STATUSES = ['submitted','approved','building','done','rejected'];
+  el.innerHTML = keyCard + reqs.map(r => `<div class="card">
+      <div class="row">
+        <h3 style="margin:0">${esc(r.title)}</h3>
+        <span class="pill ${r.status==='approved'||r.status==='done'?'active':''}">${r.status}</span>
+        <span class="muted">by ${esc(r.username||r.requester||'?')} · ${r.subject?esc(r.subject)+' · ':''}${fmt(r.created_at)}</span>
+        <div style="margin-left:auto" class="row">
+          <select onchange="setReqStatus(${r.id}, this.value)">
+            ${STATUSES.map(s=>`<option value="${s}" ${s===r.status?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <button class="act danger" onclick="delReq(${r.id},'${esc(r.title)}')">Delete</button>
+        </div>
+      </div>
+      <details style="margin-top:8px"><summary>View the full idea</summary>
+        <pre style="white-space:pre-wrap;background:#0f1729;border:1px solid #28324f;border-radius:8px;padding:12px;margin-top:8px;font-size:.85rem">${esc(r.requirements)}</pre>
+      </details>
+    </div>`).join('');
+}
+async function saveKey() {
+  const key = document.getElementById('aiKey').value.trim();
+  if (!key) return;
+  const msg = document.getElementById('aiKeyMsg'); msg.textContent = 'Testing the key…';
+  try { await api('/ai-key', { method:'POST', body: JSON.stringify({ key }) }); toast('AI helper switched on'); loadRequests(); }
+  catch (e) { msg.textContent = '⚠️ ' + e.message; }
+}
+async function clearKey() { if (!confirm('Turn off the AI helper?')) return; await api('/ai-key', { method:'DELETE' }); loadRequests(); }
+async function setReqStatus(id, status) { await api(`/game-requests/${id}/status`, { method:'POST', body: JSON.stringify({ status }) }); toast('Updated'); }
+async function delReq(id, title) { if (!confirm(`Delete the idea "${title}"?`)) return; await api(`/game-requests/${id}`, { method:'DELETE' }); loadRequests(); }
 
 // ─── Typing Train ────────────────────────────────────────────────────────────
 async function loadTyping() {

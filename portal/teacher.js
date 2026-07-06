@@ -5,10 +5,13 @@
 // Word data (lists/words/mastery/sessions) lives in one shared DB, so most
 // endpoints hit the DB directly; live actions (kick, list-changed) fan out to
 // the mounted game instances.
-const express = require('express');
-const path    = require('path');
-const bcrypt  = require('bcryptjs');
-const db      = require('../shared/db');
+const express   = require('express');
+const path      = require('path');
+const bcrypt    = require('bcryptjs');
+const Anthropic = require('@anthropic-ai/sdk');
+const db        = require('../shared/db');
+
+const WIZARD_MODEL = process.env.WIZARD_MODEL || 'claude-opus-4-8';
 
 const TEACHER_PASSWORD = process.env.TEACHER_PASSWORD || 'teacher';
 
@@ -130,6 +133,44 @@ module.exports = function createTeacher(mounted) {
     db.typDeleteStory(Number(req.params.id));
     res.json({ ok: true });
   });
+
+  // ─── Game Wizard: AI helper key ─────────────────────────────────────────────
+  // Stored in the DB (dashboard is password-gated); never returned to the client.
+  // A key in the server environment takes precedence and can't be edited here.
+  router.get('/api/ai-key', (req, res) => {
+    const envKey = !!process.env.ANTHROPIC_API_KEY;
+    const dbKey  = !!db.getSetting('anthropic_api_key');
+    res.json({ set: envKey || dbKey, source: envKey ? 'env' : (dbKey ? 'db' : 'none'), editable: !envKey, model: WIZARD_MODEL });
+  });
+  router.post('/api/ai-key', async (req, res) => {
+    if (process.env.ANTHROPIC_API_KEY) return res.status(409).json({ error: 'A key is already set in the server environment; change it there.' });
+    const key = (req.body || {}).key;
+    if (!key || typeof key !== 'string' || key.trim().length < 20) return res.status(400).json({ error: 'That does not look like an API key.' });
+    try {
+      await new Anthropic({ apiKey: key.trim() }).models.retrieve(WIZARD_MODEL);   // validates auth cheaply
+    } catch (e) {
+      return res.status(400).json({ error: 'The key was rejected: ' + String(e.message || 'invalid').slice(0, 140) });
+    }
+    db.setSetting('anthropic_api_key', key.trim());
+    res.json({ ok: true });
+  });
+  router.delete('/api/ai-key', (req, res) => { db.delSetting('anthropic_api_key'); res.json({ ok: true }); });
+
+  // ─── Game Wizard: requests kids submitted ───────────────────────────────────
+  router.get('/api/game-requests', (req, res) => res.json(db.gameReqAll()));
+  router.get('/api/game-requests/:id', (req, res) => {
+    const r = db.gameReqGet(Number(req.params.id));
+    if (!r) return res.status(404).json({ error: 'Not found' });
+    res.json(r);
+  });
+  router.post('/api/game-requests/:id/status', (req, res) => {
+    const ok = ['submitted', 'approved', 'rejected', 'building', 'done'];
+    const s = (req.body || {}).status;
+    if (!ok.includes(s)) return res.status(400).json({ error: 'Bad status' });
+    db.gameReqSetStatus(Number(req.params.id), s);
+    res.json({ ok: true });
+  });
+  router.delete('/api/game-requests/:id', (req, res) => { db.gameReqDelete(Number(req.params.id)); res.json({ ok: true }); });
 
   // ─── Spelling: recent sessions ──────────────────────────────────────────────
   router.get('/api/sessions', (req, res) => res.json(db.allSessions()));

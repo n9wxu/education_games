@@ -9,6 +9,9 @@
 // Each game gets its own Socket.IO instance bound to `${base}/socket.io` so the
 // three games coexist on one port without colliding.
 // ─────────────────────────────────────────────────────────────────────────────
+// Load a gitignored .env (for ANTHROPIC_API_KEY etc.) if present — best effort.
+try { require('process').loadEnvFile(require('path').join(__dirname, '.env')); } catch (e) {}
+
 const express = require('express');
 const http    = require('http');
 const path    = require('path');
@@ -38,6 +41,10 @@ for (const g of GAMES) {
   app.use(g.base, inst.router);
   console.log(`Mounted ${g.title} at ${g.base} (socket ${g.base}/socket.io)`);
 }
+
+// ─── Game Wizard (kids design new games with an AI helper) ────────────────────
+app.use('/wizard', express.json(), authRouter);          // shared login/register/me
+app.use('/wizard', require('./wizard')().router);
 
 // ─── Unified teacher interface ────────────────────────────────────────────────
 app.use('/teacher', require('./portal/teacher')(mounted));

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Make a Game!</title>
+<style>
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+  body { background: linear-gradient(160deg,#ffe29a 0%,#ffa99f 45%,#a18cd1 100%); color:#231a3a; }
+  #wrap { max-width:760px; margin:0 auto; height:100dvh; display:flex; flex-direction:column; padding:10px; }
+  header { display:flex; align-items:center; gap:10px; padding:6px 8px; }
+  header h1 { font-size:1.4rem; margin:0; }
+  header .sp { margin-left:auto; }
+  header a, #who { color:#4a2f7a; text-decoration:none; font-weight:600; font-size:.9rem; }
+  #chat { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:12px; }
+  .msg { max-width:82%; padding:12px 15px; border-radius:18px; font-size:1.05rem; line-height:1.4; white-space:pre-wrap; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+  .msg.bot { background:#fff; border-bottom-left-radius:5px; align-self:flex-start; }
+  .msg.me  { background:#4a2f7a; color:#fff; border-bottom-right-radius:5px; align-self:flex-end; }
+  .msg .who { font-size:.72rem; opacity:.6; display:block; margin-bottom:3px; }
+  .saved { align-self:center; background:#2e7d5b; color:#fff; padding:10px 16px; border-radius:14px; font-weight:700; text-align:center; }
+  #chips { display:flex; flex-wrap:wrap; gap:8px; padding:0 12px 6px; }
+  .chip { background:rgba(255,255,255,.85); border:2px solid #fff; border-radius:999px; padding:8px 14px; font-size:1rem; cursor:pointer; }
+  .chip:active { transform:scale(.96); }
+  #bar { display:flex; gap:8px; padding:8px; }
+  #bar input { flex:1; padding:14px 16px; border-radius:16px; border:none; font-size:1.1rem; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  #bar button { border:none; background:#4a2f7a; color:#fff; font-size:1.3rem; width:56px; border-radius:16px; cursor:pointer; }
+  #bar button:disabled { opacity:.5; }
+  .typing { font-style:italic; opacity:.6; }
+  /* login */
+  .overlay { position:fixed; inset:0; background:rgba(60,40,90,.6); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
+  .panel { background:#fff; border-radius:22px; padding:26px; width:min(400px,94vw); text-align:center; }
+  .panel h2 { margin:0 0 6px; }
+  .panel p { color:#6b5b8a; margin:4px 0 14px; }
+  .panel input { width:100%; padding:13px; margin:7px 0; border-radius:12px; border:2px solid #e3dcf3; font-size:1.05rem; }
+  .btn { background:#4a2f7a; color:#fff; border:none; border-radius:12px; padding:12px 18px; font-size:1.05rem; cursor:pointer; }
+  .btn.sec { background:#e3dcf3; color:#4a2f7a; }
+  .err { color:#c0324b; min-height:1em; font-size:.9rem; }
+  .warn { background:#fff4d6; color:#7a5b00; padding:8px 12px; border-radius:12px; margin:6px 12px; font-size:.9rem; text-align:center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>🎨 Make a Game!</h1>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <a href="/">← Games</a>
+  </header>
+  <div id="aiWarn" class="warn" style="display:none">The helper isn't switched on yet — ask a grown-up. You can still see how it works.</div>
+  <div id="chat"></div>
+  <div id="chips"></div>
+  <div id="bar">
+    <input id="text" placeholder="Type here…" autocomplete="off" enterkeyhint="send"
+           onkeydown="if(event.key==='Enter')W.send()">
+    <button id="sendBtn" onclick="W.send()">▶</button>
+  </div>
+</div>
+
+<div class="overlay" id="loginOv">
+  <div class="panel">
+    <h2>🎨 Make a Game!</h2>
+    <p>Log in with your games account and tell the helper what game you'd like.</p>
+    <input id="u" placeholder="Your name" autocomplete="username">
+    <input id="p" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')W.login()">
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+      <button class="btn" onclick="W.login()">Let's go!</button>
+      <button class="btn sec" onclick="W.register()">New account</button>
+    </div>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<script src="wizard.js"></script>
+</body>
+</html>

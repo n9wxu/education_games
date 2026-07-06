@@ -66,7 +66,19 @@
       <p>Drive a steam train around the track by touch-typing — learn the keys, then race through stories.</p>
       <span class="tag">Typing · keyboard</span>
     </a>
+    <a class="card" href="/wizard/" id="wizardCard" style="display:none">
+      <div class="icon">🎨</div>
+      <h2>Make a Game!</h2>
+      <p>Have an idea? Chat with the friendly helper and design your very own game to add to the collection.</p>
+      <span class="tag">Create · your idea</span>
+    </a>
   </div>
+  <script>
+    // Only show "Make a Game" where the AI helper is switched on (an API key is set).
+    fetch('/wizard/api/status').then(r => r.json())
+      .then(s => { if (s.aiEnabled) document.getElementById('wizardCard').style.display = ''; })
+      .catch(() => {});
+  </script>
 
   <footer>
     <a class="teacher-link" href="/teacher">👩‍🏫 Teacher / Parent Dashboard</a>

@@ -160,6 +160,28 @@ db.exec(`
     updated_at INTEGER DEFAULT (unixepoch()),
     PRIMARY KEY (player_id, story_id)
   );
+
+  -- ── Game Wizard: game ideas kids design with the AI helper ────────────────
+  CREATE TABLE IF NOT EXISTS game_requests (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id    INTEGER REFERENCES players(id) ON DELETE SET NULL,
+    requester    TEXT,                         -- kid name for commit credit
+    title        TEXT NOT NULL,
+    slug         TEXT,
+    summary      TEXT,
+    subject      TEXT,                          -- e.g. spelling, math, typing
+    goal         TEXT,                          -- 'struggle' | 'reinforce'
+    requirements TEXT NOT NULL,                 -- full markdown requirements
+    status       TEXT NOT NULL DEFAULT 'submitted',  -- submitted|approved|rejected|building|done
+    created_at   INTEGER DEFAULT (unixepoch()),
+    updated_at   INTEGER DEFAULT (unixepoch())
+  );
+
+  -- ── Key/value settings (e.g. the Game Wizard's Anthropic API key) ─────────
+  CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
 
 // Idempotent migrations for DBs created by older game versions
@@ -324,6 +346,18 @@ const q = {
   typSetBook:  db.prepare(`INSERT INTO typing_book_progress (player_id, story_id, para_index) VALUES (?, ?, ?)
     ON CONFLICT(player_id, story_id) DO UPDATE SET para_index = excluded.para_index, updated_at = unixepoch()`),
   typDelBook:  db.prepare('DELETE FROM typing_book_progress WHERE player_id = ?'),
+  // Game Wizard requests
+  grInsert: db.prepare(`INSERT INTO game_requests (player_id, requester, title, slug, summary, subject, goal, requirements, status)
+    VALUES (@player_id, @requester, @title, @slug, @summary, @subject, @goal, @requirements, 'submitted')`),
+  grForPlayer: db.prepare('SELECT id, title, subject, goal, status, created_at FROM game_requests WHERE player_id = ? ORDER BY created_at DESC'),
+  grAll:       db.prepare(`SELECT gr.*, p.username FROM game_requests gr LEFT JOIN players p ON p.id = gr.player_id ORDER BY gr.created_at DESC`),
+  grGet:       db.prepare('SELECT * FROM game_requests WHERE id = ?'),
+  grSetStatus: db.prepare('UPDATE game_requests SET status = ?, updated_at = unixepoch() WHERE id = ?'),
+  grDelete:    db.prepare('DELETE FROM game_requests WHERE id = ?'),
+  // Settings
+  setGet: db.prepare('SELECT value FROM settings WHERE key = ?'),
+  setPut: db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
+  setDel: db.prepare('DELETE FROM settings WHERE key = ?'),
 };
 
 function createToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -461,6 +495,19 @@ function typDeleteStory(id)         { q.typDeleteStory.run(id); }
 function typGetBookPos(pid, sid)    { const r = q.typGetBook.get(pid, sid); return r ? r.para_index : 0; }
 function typSetBookPos(pid, sid, i) { q.typSetBook.run(pid, sid, i | 0); }
 
+// ─── Game Wizard requests ────────────────────────────────────────────────────
+function gameReqAdd(r)              { return q.grInsert.run(r).lastInsertRowid; }
+function gameReqForPlayer(pid)      { return q.grForPlayer.all(pid); }
+function gameReqAll()               { return q.grAll.all(); }
+function gameReqGet(id)             { return q.grGet.get(id); }
+function gameReqSetStatus(id, s)    { q.grSetStatus.run(s, id); }
+function gameReqDelete(id)          { q.grDelete.run(id); }
+
+// ─── Settings (key/value) ────────────────────────────────────────────────────
+function getSetting(k)    { const r = q.setGet.get(k); return r ? r.value : null; }
+function setSetting(k, v) { q.setPut.run(k, v); }
+function delSetting(k)    { q.setDel.run(k); }
+
 module.exports = {
   // accounts / auth
   register, findPlayer, getPlayerById, getPlayer: getPlayerById, allPlayers,
@@ -480,6 +527,10 @@ module.exports = {
   typRecordLap, typBestLap, typRecentLaps, typLevelLeaderboard,
   typAllStories, typActiveStories, typGetStory, typAddStory, typSeedStory,
   typToggleStory, typDeleteStory, typGetBookPos, typSetBookPos,
+  // game wizard
+  gameReqAdd, gameReqForPlayer, gameReqAll, gameReqGet, gameReqSetStatus, gameReqDelete,
+  // settings
+  getSetting, setSetting, delSetting,
   // raw handle (for unified teacher aggregate queries if needed)
   _db: db,
 };
