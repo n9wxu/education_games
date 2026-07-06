@@ -53,6 +53,7 @@
     <button class="tab active" data-tab="players" onclick="showTab('players')">Players</button>
     <button class="tab" data-tab="words" onclick="showTab('words')">Word Lists</button>
     <button class="tab" data-tab="typing" onclick="showTab('typing')">Typing Train</button>
+    <button class="tab" data-tab="skate" onclick="showTab('skate')">Skate 'n' Add</button>
     <button class="tab" data-tab="requests" onclick="showTab('requests')">Game Requests</button>
     <button class="tab" data-tab="sessions" onclick="showTab('sessions')">Spelling Sessions</button>
     <button class="tab" data-tab="live" onclick="showTab('live')">Live</button>
@@ -61,6 +62,7 @@
     <div class="panel active" id="panel-players"></div>
     <div class="panel" id="panel-words"></div>
     <div class="panel" id="panel-typing"></div>
+    <div class="panel" id="panel-skate"></div>
     <div class="panel" id="panel-requests"></div>
     <div class="panel" id="panel-sessions"></div>
     <div class="panel" id="panel-live"></div>
@@ -96,7 +98,33 @@ function showTab(t) {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
   document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-' + t).classList.add('active');
-  ({ players: loadPlayers, words: loadWords, typing: loadTyping, requests: loadRequests, sessions: loadSessions, live: loadLive }[t])();
+  ({ players: loadPlayers, words: loadWords, typing: loadTyping, skate: loadSkate, requests: loadRequests, sessions: loadSessions, live: loadLive }[t])();
+}
+
+// ─── Skate 'n' Add ───────────────────────────────────────────────────────────
+async function loadSkate() {
+  const el = document.getElementById('panel-skate');
+  el.innerHTML = '<p class="muted">Loading…</p>';
+  const rows = await api('/skate');
+  if (!rows.length) { el.innerHTML = '<p class="muted">No one has played Skate \'n\' Add yet.</p>'; return; }
+  el.innerHTML = '<div class="card"><h3>Skate \'n\' Add — addition practice</h3>' +
+    rows.map(r => {
+      const tot = r.correct + r.incorrect, acc = tot ? Math.round(r.correct / tot * 100) : 0;
+      return `<details style="border-bottom:1px solid #28324f;padding:6px 0" data-pid="${r.player_id}" ontoggle="if(this.open)loadSkateFacts(${r.player_id},this)">
+        <summary><b>${esc(r.username)}</b> <span class="muted">— ${r.correct}✓ / ${r.incorrect}✗ · ${acc}% · best streak ${r.best_streak}</span></summary>
+        <div class="sfacts muted" style="margin:8px 0 4px">Loading…</div>
+      </details>`;
+    }).join('') + '</div>';
+}
+async function loadSkateFacts(pid, node) {
+  const box = node.querySelector('.sfacts');
+  const facts = await api(`/skate/${pid}/facts`);
+  const weak = facts.map(f => ({ f: `${f.a}+${f.b}`, tot: f.correct + f.incorrect, acc: (f.correct + f.incorrect) ? f.correct / (f.correct + f.incorrect) : 1 }))
+    .filter(x => x.tot >= 2).sort((a, b) => a.acc - b.acc).slice(0, 8).filter(x => x.acc < 1);
+  box.classList.remove('muted');
+  box.innerHTML = weak.length
+    ? 'Trickiest facts: ' + weak.map(x => `<span class="chip">${x.f} (${Math.round(x.acc*100)}%)</span>`).join(' ')
+    : '<span class="muted">no tricky facts yet — all solid 👍</span>';
 }
 
 // ─── Game Requests (from the kids' Game Wizard) ──────────────────────────────
@@ -337,7 +365,7 @@ async function loadLive() {
     const el = document.getElementById('panel-live');
     if (!document.getElementById('panel-live').classList.contains('active')) { clearInterval(liveTimer); return; }
     const live = await api('/live');
-    const names = { math:'🐊 Math Gator', spelling:'👾 Spelling Invaders', sniper:'🎯 Spelling Sniper' };
+    const names = { math:'🐊 Math Gator', spelling:'👾 Spelling Invaders', sniper:'🎯 Spelling Sniper', typing:'🚂 Typing Train', skate:"🛼 Skate 'n' Add" };
     el.innerHTML = Object.entries(live).map(([k,v]) => {
       if (!v) return '';
       const players = (v.players||[]).map(p=>`${esc(p.username)} (${p.score??''}${p.lives!=null?'♥'+p.lives:''})`).join(', ') || '<span class="muted">nobody playing</span>';

@@ -172,6 +172,10 @@ module.exports = function createTeacher(mounted) {
   });
   router.delete('/api/game-requests/:id', (req, res) => { db.gameReqDelete(Number(req.params.id)); res.json({ ok: true }); });
 
+  // ─── Skate 'n' Add ──────────────────────────────────────────────────────────
+  router.get('/api/skate', (req, res) => res.json(db.skateAll()));
+  router.get('/api/skate/:id/facts', (req, res) => res.json(db.skateFacts(Number(req.params.id))));
+
   // ─── Spelling: recent sessions ──────────────────────────────────────────────
   router.get('/api/sessions', (req, res) => res.json(db.allSessions()));
 

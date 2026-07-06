@@ -182,6 +182,24 @@ db.exec(`
     key   TEXT PRIMARY KEY,
     value TEXT
   );
+
+  -- ── Skate 'n' Add ─────────────────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS skate_stats (
+    player_id   INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+    correct     INTEGER DEFAULT 0,
+    incorrect   INTEGER DEFAULT 0,
+    best_streak INTEGER DEFAULT 0,
+    games       INTEGER DEFAULT 0,
+    updated_at  INTEGER DEFAULT (unixepoch())
+  );
+  CREATE TABLE IF NOT EXISTS skate_fact_stats (
+    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    a         INTEGER NOT NULL,
+    b         INTEGER NOT NULL,
+    correct   INTEGER DEFAULT 0,
+    incorrect INTEGER DEFAULT 0,
+    PRIMARY KEY (player_id, a, b)
+  );
 `);
 
 // Idempotent migrations for DBs created by older game versions
@@ -358,6 +376,17 @@ const q = {
   setGet: db.prepare('SELECT value FROM settings WHERE key = ?'),
   setPut: db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'),
   setDel: db.prepare('DELETE FROM settings WHERE key = ?'),
+  // Skate 'n' Add
+  skInit:        db.prepare('INSERT OR IGNORE INTO skate_stats (player_id) VALUES (?)'),
+  skIncCorrect:  db.prepare('UPDATE skate_stats SET correct = correct + 1, best_streak = MAX(best_streak, ?), updated_at = unixepoch() WHERE player_id = ?'),
+  skIncWrong:    db.prepare('UPDATE skate_stats SET incorrect = incorrect + 1, updated_at = unixepoch() WHERE player_id = ?'),
+  skGet:         db.prepare('SELECT * FROM skate_stats WHERE player_id = ?'),
+  skFactUp:      db.prepare(`INSERT INTO skate_fact_stats (player_id, a, b, correct, incorrect) VALUES (@pid, @a, @b, @c, @i)
+    ON CONFLICT(player_id, a, b) DO UPDATE SET correct = correct + @c, incorrect = incorrect + @i`),
+  skFacts:       db.prepare('SELECT a, b, correct, incorrect FROM skate_fact_stats WHERE player_id = ? ORDER BY a, b'),
+  skAll:         db.prepare('SELECT s.*, p.username FROM skate_stats s JOIN players p ON p.id = s.player_id ORDER BY p.username COLLATE NOCASE'),
+  skDelStats:    db.prepare('DELETE FROM skate_stats WHERE player_id = ?'),
+  skDelFacts:    db.prepare('DELETE FROM skate_fact_stats WHERE player_id = ?'),
 };
 
 function createToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -424,6 +453,8 @@ const deletePlayer = db.transaction(pid => {
   q.typDelKeyStats.run(pid);
   q.typDelLaps.run(pid);
   q.typDelBook.run(pid);
+  q.skDelStats.run(pid);
+  q.skDelFacts.run(pid);
   q.deletePlayer.run(pid);
 });
 
@@ -508,6 +539,16 @@ function getSetting(k)    { const r = q.setGet.get(k); return r ? r.value : null
 function setSetting(k, v) { q.setPut.run(k, v); }
 function delSetting(k)    { q.setDel.run(k); }
 
+// ─── Skate 'n' Add ───────────────────────────────────────────────────────────
+const skateRecord = db.transaction((pid, a, b, isCorrect, streak) => {
+  q.skInit.run(pid);
+  if (isCorrect) { q.skIncCorrect.run(streak | 0, pid); q.skFactUp.run({ pid, a, b, c: 1, i: 0 }); }
+  else           { q.skIncWrong.run(pid);               q.skFactUp.run({ pid, a, b, c: 0, i: 1 }); }
+});
+function skateStats(pid) { q.skInit.run(pid); return q.skGet.get(pid); }
+function skateFacts(pid) { return q.skFacts.all(pid); }
+function skateAll()      { return q.skAll.all(); }
+
 module.exports = {
   // accounts / auth
   register, findPlayer, getPlayerById, getPlayer: getPlayerById, allPlayers,
@@ -531,6 +572,8 @@ module.exports = {
   gameReqAdd, gameReqForPlayer, gameReqAll, gameReqGet, gameReqSetStatus, gameReqDelete,
   // settings
   getSetting, setSetting, delSetting,
+  // skate 'n' add
+  skateRecord, skateStats, skateFacts, skateAll,
   // raw handle (for unified teacher aggregate queries if needed)
   _db: db,
 };

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skate 'n' Add</title>
+<style>
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; background:#12043a; color:#fff; overflow:hidden; }
+  #wrap { max-width:940px; margin:0 auto; padding:8px; }
+  header { display:flex; align-items:center; gap:14px; padding:4px 6px; }
+  header h1 { font-size:1.3rem; margin:0; }
+  header .sp { margin-left:auto; }
+  header a, #who { color:#9fd0ff; text-decoration:none; font-weight:600; font-size:.9rem; }
+  #hud { display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding:4px 8px; font-size:1rem; }
+  #hud b { color:#ffd23f; }
+  #hud .team { color:#7be06a; }
+  canvas { display:block; width:100%; border-radius:16px; background:#1c0a54; touch-action:none; cursor:none; }
+  #controls { display:flex; gap:18px; align-items:center; padding:8px; flex-wrap:wrap; }
+  #controls label { font-size:.95rem; }
+  input[type=range] { vertical-align:middle; }
+  .toggle { display:flex; align-items:center; gap:6px; background:#2a1670; padding:6px 12px; border-radius:999px; }
+  .overlay { position:fixed; inset:0; background:rgba(15,4,50,.9); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
+  .panel { background:#241063; border:2px solid #3a2299; border-radius:20px; padding:26px; width:min(400px,94vw); text-align:center; }
+  .panel h2 { margin:0 0 6px; } .panel p { color:#c6b6ff; margin:4px 0 14px; }
+  .panel input { width:100%; padding:12px; margin:7px 0; border-radius:12px; border:2px solid #3a2299; background:#160a45; color:#fff; font-size:1.05rem; }
+  .btn { background:#ff5aa5; color:#fff; border:none; border-radius:12px; padding:12px 18px; font-size:1.05rem; cursor:pointer; }
+  .btn.sec { background:#3a2299; }
+  .err { color:#ff9db0; min-height:1em; font-size:.9rem; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>🛼 Skate 'n' Add</h1>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <a href="/">← Games</a>
+  </header>
+  <div id="hud">
+    <span>Problem: <b id="prob">…</b></span>
+    <span>Score <b id="score">0</b></span>
+    <span>Streak <b id="streak">0</b></span>
+    <span>Right <b id="acc">100</b>%</span>
+    <span class="team" id="teamWrap" style="display:none">Team <b class="team" id="team">0</b></span>
+  </div>
+  <canvas id="c" width="900" height="520"></canvas>
+  <div id="controls">
+    <label>🐢 Speed <input id="speed" type="range" min="1" max="5" value="2"> 🐇</label>
+    <label class="toggle"><input id="teamToggle" type="checkbox"> 🤝 Team score</label>
+    <span style="opacity:.7;font-size:.9rem">Move your skater with the mouse or finger. Skate into the star with the right answer!</span>
+  </div>
+</div>
+
+<div class="overlay" id="loginOv">
+  <div class="panel">
+    <h2>🛼 Skate 'n' Add</h2>
+    <p>Log in with your games account and skate to the right answer!</p>
+    <input id="u" placeholder="Your name" autocomplete="username">
+    <input id="p" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')S.login()">
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+      <button class="btn" onclick="S.login()">Let's skate!</button>
+      <button class="btn sec" onclick="S.register()">New account</button>
+    </div>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<script src="/skate/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
