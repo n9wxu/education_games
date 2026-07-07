@@ -19,11 +19,17 @@
   #timer { height:8px; background:#2b1d63; border-radius:6px; overflow:hidden; margin-bottom:12px; }
   #timerBar { height:100%; width:100%; background:linear-gradient(90deg,#ffd23f,#ff8a3d); transition:width .1s linear; }
   #sentence { font-size:1.5rem; line-height:1.5; text-align:center; min-height:2.2em; }
-  #sentence .blank { display:inline-block; min-width:90px; border-bottom:3px solid #ffd23f; margin:0 4px; }
+  #sentence[hidden], #build[hidden], #tiles[hidden], #answerRow[hidden] { display:none; }
+  #build { min-height:2.2em; text-align:center; font-size:1.4rem; border-bottom:2px dashed #2b1d63; padding-bottom:8px; }
+  #build .bword { display:inline-block; background:#2b1d63; border-radius:8px; padding:4px 10px; margin:3px; }
+  #build .caret { color:#ffd23f; }
+  #tiles { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
+  .tile { background:#ffd23f; color:#3a2a00; border:none; border-radius:10px; padding:9px 13px; font-size:1.15rem; font-weight:600; cursor:pointer; }
+  .tile:active { transform:scale(.95); }
+  .tile.used { visibility:hidden; }
   #answerRow { display:flex; gap:8px; margin-top:14px; justify-content:center; }
-  #answerRow input { flex:0 1 320px; padding:13px 15px; border-radius:12px; border:2px solid #2b1d63; background:#080322; color:#fff; font-size:1.2rem; text-align:center; }
-  #answerRow button { border:none; background:#ffd23f; color:#3a2a00; border-radius:12px; padding:0 18px; font-size:1.1rem; font-weight:700; cursor:pointer; }
-  #answerRow[hidden] { display:none; }
+  #answerRow button { border:none; border-radius:12px; padding:10px 18px; font-size:1.05rem; font-weight:700; cursor:pointer; }
+  #answerRow .go { background:#7be06a; color:#04250c; } #answerRow .undo { background:#2b1d63; color:#eaf0ff; }
   #feedback { text-align:center; margin-top:10px; min-height:1.4em; font-size:1.05rem; }
   #controls { display:flex; gap:16px; align-items:center; padding:8px; font-size:.95rem; }
   .overlay { position:fixed; inset:0; background:rgba(5,1,15,.92); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
@@ -52,16 +58,17 @@
   <div id="stage">
     <div id="timer"><div id="timerBar"></div></div>
     <div id="sentence">Get ready to read…</div>
+    <div id="build" hidden></div>
+    <div id="tiles" hidden></div>
     <div id="answerRow" hidden>
-      <input id="answer" placeholder="type the missing word" autocomplete="off" autocapitalize="off" spellcheck="false"
-             onkeydown="if(event.key==='Enter')R.submit()">
-      <button onclick="R.submit()">Blast off ▲</button>
+      <button class="undo" onclick="R.undo()">↶ Undo</button>
+      <button class="go" onclick="R.submit()">Blast off ▲</button>
     </div>
     <div id="feedback"></div>
   </div>
   <div id="controls">
     <label>🐢 Reading time <input id="speed" type="range" min="1" max="5" value="3"> 🐇</label>
-    <span style="opacity:.7">Read fast — the sentence hides, then fill in the missing word!</span>
+    <span style="opacity:.7">Read fast — the sentence hides, then tap the words back into the right order!</span>
   </div>
 </div>
 

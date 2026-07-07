@@ -28,6 +28,7 @@ const R = {
   async login()    { ensureAudio(); try { const j = await post('/login',    { username: $('#u').value.trim(), password: $('#p').value }); done(j.token, j.username); } catch (e) { $('#loginErr').textContent = e.message; } },
   async register() { ensureAudio(); try { const j = await post('/register', { username: $('#u').value.trim(), password: $('#p').value }); done(j.token, j.username); } catch (e) { $('#loginErr').textContent = e.message; } },
   submit() { submit(); },
+  undo() { undoWord(); },
 };
 window.R = R;
 function done(t, name) {
@@ -48,39 +49,44 @@ function connect() {
   socket.emit('join');
 }
 
-// ── Round flow ───────────────────────────────────────────────────────────────
-function nextRound() { $('#answerRow').hidden = true; $('#feedback').textContent = ''; $('#sentence').textContent = 'Get ready to read…'; setTimeout(() => socket.emit('newRound'), 700); }
+// ── Round flow (read, then unscramble the sentence) ──────────────────────────
+let build = [];   // [{ word, el }] the sentence the child is rebuilding
+function hideStage() { $('#build').hidden = true; $('#tiles').hidden = true; $('#answerRow').hidden = true; }
+function nextRound() { hideStage(); $('#feedback').textContent = ''; $('#sentence').hidden = false; $('#sentence').textContent = 'Get ready to read…'; setTimeout(() => socket.emit('newRound'), 700); }
 function startRound(r) {
-  round = r; phase = 'read';
-  $('#answerRow').hidden = true; $('#feedback').textContent = '';
-  $('#sentence').innerHTML = r.words.map(escapeWord).join(' ');
-  // brief display, scaled by the reading-time dial (higher = shorter)
-  const ms = Math.max(1400, r.displayMs * (1.4 - speed * 0.18));
+  round = r; phase = 'read'; build = [];
+  hideStage(); $('#feedback').textContent = '';
+  $('#sentence').hidden = false; $('#sentence').innerHTML = r.sentence.map(escapeWord).join(' ');
+  const ms = Math.max(1400, r.displayMs * (1.4 - speed * 0.18));   // reading-time dial
   tEnd = performance.now() + ms;
-  clearTimeout(readTimer); readTimer = setTimeout(showBlank, ms);
+  clearTimeout(readTimer); readTimer = setTimeout(showTiles, ms);
 }
-function showBlank() {
-  phase = 'answer';
-  $('#timerBar').style.width = '0%';
-  $('#sentence').innerHTML = round.words.map((w, i) => i === round.blankIndex ? '<span class="blank">?</span>' : escapeWord(w)).join(' ');
-  $('#answerRow').hidden = false; const inp = $('#answer'); inp.value = ''; inp.focus();
+function showTiles() {
+  phase = 'answer'; $('#timerBar').style.width = '0%';
+  $('#sentence').hidden = true;
+  $('#build').hidden = false; renderBuild();
+  const tiles = $('#tiles'); tiles.hidden = false; tiles.innerHTML = '';
+  round.tiles.forEach(w => {
+    const b = document.createElement('button'); b.className = 'tile'; b.textContent = w;
+    b.onclick = () => { if (phase !== 'answer' || b.classList.contains('used')) return; b.classList.add('used'); build.push({ word: w, el: b }); renderBuild(); };
+    tiles.appendChild(b);
+  });
+  $('#answerRow').hidden = false;
 }
+function renderBuild() { $('#build').innerHTML = build.map(b => `<span class="bword">${escapeWord(b.word)}</span>`).join(' ') + ' <span class="caret">▮</span>'; }
+function undoWord() { if (phase !== 'answer' || !build.length) return; build.pop().el.classList.remove('used'); renderBuild(); }
 function submit() {
-  if (phase !== 'answer') return;
-  const g = $('#answer').value.trim(); if (!g) return;
+  if (phase !== 'answer' || !build.length) return;
   phase = 'result'; total++;
-  socket.emit('answer', { guess: g });
+  socket.emit('answer', { order: build.map(b => b.word) });
 }
-function showResult({ correct: ok, answer }) {
-  const fb = $('#feedback'); $('#answerRow').hidden = true;
-  if (ok) {
-    correct++; score++; streak++; myHeight++; ding(); whoosh();
-    fb.style.color = '#7be06a'; fb.textContent = '✅ Blast off! 🚀';
-  } else {
-    streak = 0; fb.style.color = '#ff9db0'; fb.textContent = `❌ Try again — the word was “${answer}”`;
-  }
+function showResult({ correct: ok, sentence }) {
+  hideStage();
+  const fb = $('#feedback');
+  if (ok) { correct++; score++; streak++; myHeight++; ding(); whoosh(); fb.style.color = '#7be06a'; fb.textContent = '✅ Blast off! 🚀'; }
+  else    { streak = 0; fb.style.color = '#ff9db0'; fb.textContent = `❌ Not quite — it was: “${sentence}”`; }
   updateHud();
-  setTimeout(nextRound, ok ? 700 : 1400);
+  setTimeout(nextRound, ok ? 800 : 2200);
 }
 function updateHud() { $('#score').textContent = myHeight; $('#streak').textContent = streak; $('#acc').textContent = total ? Math.round(correct/total*100) : 100; }
 function escapeWord(w) { return String(w).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }

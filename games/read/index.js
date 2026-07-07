@@ -56,13 +56,14 @@ module.exports = function createRead({ base = '/read', io }) {
     return cand.length ? cand[Math.floor(Math.random() * cand.length)] : -1;
   }
   const pool = sentencePool();
+  function shuffled(a) { const s = a.slice(); for (let i = s.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [s[i], s[j]] = [s[j], s[i]]; } return s; }
   function makeRound() {
     const words = pool[Math.floor(Math.random() * pool.length)];
-    let bi = targetIndex(words);
-    if (bi < 0) bi = Math.floor(words.length / 2);
-    const answer = norm(words[bi]);
-    const displayMs = Math.max(2500, Math.min(8000, 1500 + words.length * 320));
-    return { words, blankIndex: bi, answer, displayMs };
+    let tiles = shuffled(words);
+    // avoid handing back the sentence already in order
+    if (tiles.join(' ') === words.join(' ') && words.length > 1) tiles = shuffled(words);
+    const displayMs = Math.max(2500, Math.min(9000, 1500 + words.length * 340));
+    return { words, tiles, ansSeq: words.map(norm), displayMs };
   }
 
   router.get('/api/my-stats', requireAuth, (req, res) => res.json(db.readingStats(req.player.id)));
@@ -83,20 +84,23 @@ module.exports = function createRead({ base = '/read', io }) {
     socket.on('newRound', () => {
       if (!rink.has(socket.id)) return;
       const r = makeRound();
-      rounds.set(socket.id, { answer: r.answer });
-      socket.emit('round', { words: r.words, blankIndex: r.blankIndex, displayMs: r.displayMs });
+      rounds.set(socket.id, { ansSeq: r.ansSeq, words: r.words });
+      // The full sentence is shown only for the brief read; the answer is the ORDER,
+      // which the child must reconstruct from the scrambled tiles.
+      socket.emit('round', { sentence: r.words, tiles: r.tiles, displayMs: r.displayMs });
     });
 
-    // Server-graded — the client never had the answer, so it can't cheat the check.
-    socket.on('answer', ({ guess }) => {
+    // Server-graded: compare the submitted word order to the original sentence.
+    socket.on('answer', ({ order }) => {
       if (!player) return;
       const r = rounds.get(socket.id); if (!r) return;
       rounds.delete(socket.id);
-      const correct = norm(guess) === r.answer && r.answer.length > 0;
+      const seq = Array.isArray(order) ? order.map(norm) : [];
+      const correct = seq.length === r.ansSeq.length && seq.every((w, i) => w === r.ansSeq[i]);
       const me = rink.get(socket.id);
       if (correct) { if (me) { me.streak++; me.height++; } db.readingRecord(player.id, true, me ? me.streak : 1); }
       else         { if (me) me.streak = 0;                db.readingRecord(player.id, false, 0); }
-      socket.emit('result', { correct, answer: r.answer });
+      socket.emit('result', { correct, sentence: r.words.join(' ') });
       if (correct && me) socket.broadcast.emit('peerHeight', { id: socket.id, height: me.height });
     });
 
