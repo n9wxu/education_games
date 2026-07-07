@@ -55,6 +55,7 @@
     <button class="tab" data-tab="typing" onclick="showTab('typing')">Typing Train</button>
     <button class="tab" data-tab="skate" onclick="showTab('skate')">Skate 'n' Add</button>
     <button class="tab" data-tab="reading" onclick="showTab('reading')">Rocket Read</button>
+    <button class="tab" data-tab="more" onclick="showTab('more')">More Games</button>
     <button class="tab" data-tab="requests" onclick="showTab('requests')">Game Requests</button>
     <button class="tab" data-tab="sessions" onclick="showTab('sessions')">Spelling Sessions</button>
     <button class="tab" data-tab="live" onclick="showTab('live')">Live</button>
@@ -65,6 +66,7 @@
     <div class="panel" id="panel-typing"></div>
     <div class="panel" id="panel-skate"></div>
     <div class="panel" id="panel-reading"></div>
+    <div class="panel" id="panel-more"></div>
     <div class="panel" id="panel-requests"></div>
     <div class="panel" id="panel-sessions"></div>
     <div class="panel" id="panel-live"></div>
@@ -100,7 +102,29 @@ function showTab(t) {
   document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
   document.querySelectorAll('.panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-' + t).classList.add('active');
-  ({ players: loadPlayers, words: loadWords, typing: loadTyping, skate: loadSkate, reading: loadReading, requests: loadRequests, sessions: loadSessions, live: loadLive }[t])();
+  ({ players: loadPlayers, words: loadWords, typing: loadTyping, skate: loadSkate, reading: loadReading, more: loadMore, requests: loadRequests, sessions: loadSessions, live: loadLive }[t])();
+}
+
+// ─── More games (shared arcade stats) ────────────────────────────────────────
+const ARCADE = [
+  { key:'bigger',  name:'🐊 Hungry Number Alligator' },
+  { key:'citynum', name:'🔫 City Number Blaster' },
+  { key:'tank',    name:'💥 Tank Squad Math Blast' },
+  { key:'space',   name:'🚀 Space Blaster Buddies' },
+  { key:'art',     name:'🎨 Silly Art Party! (drawings made)' },
+];
+async function loadMore() {
+  const el = document.getElementById('panel-more');
+  el.innerHTML = '<p class="muted">Loading…</p>';
+  const results = await Promise.all(ARCADE.map(g => api('/arcade/' + g.key)));
+  el.innerHTML = ARCADE.map((g, gi) => {
+    const rows = results[gi];
+    const body = rows.length ? `<table><tr><th>Player</th><th>Right</th><th>Wrong</th><th>Accuracy</th><th>Best streak</th></tr>` +
+      rows.map(r => { const tot = r.correct + r.incorrect, acc = tot ? Math.round(r.correct/tot*100) : 0;
+        return `<tr><td>${esc(r.username)}</td><td>${r.correct}</td><td>${r.incorrect}</td><td>${acc}%</td><td>${r.best_streak}</td></tr>`; }).join('') + `</table>`
+      : '<span class="muted">No plays yet.</span>';
+    return `<div class="card"><h3>${g.name}</h3>${body}</div>`;
+  }).join('');
 }
 
 // ─── Rocket Read ─────────────────────────────────────────────────────────────
@@ -379,7 +403,7 @@ async function loadLive() {
     const el = document.getElementById('panel-live');
     if (!document.getElementById('panel-live').classList.contains('active')) { clearInterval(liveTimer); return; }
     const live = await api('/live');
-    const names = { math:'🐊 Math Gator', spelling:'👾 Spelling Invaders', sniper:'🎯 Spelling Sniper', typing:'🚂 Typing Train', skate:"🛼 Skate 'n' Add", read:'🚀 Rocket Read' };
+    const names = { math:'🐊 Math Gator', spelling:'👾 Spelling Invaders', sniper:'🎯 Spelling Sniper', typing:'🚂 Typing Train', skate:"🛼 Skate 'n' Add", read:'🚀 Rocket Read', bigger:'🐊 Hungry Alligator', citynum:'🔫 City Number Blaster', tank:'💥 Tank Squad', space:'🚀 Space Blaster', art:'🎨 Silly Art Party' };
     el.innerHTML = Object.entries(live).map(([k,v]) => {
       if (!v) return '';
       const players = (v.players||[]).map(p=>`${esc(p.username)} (${p.score??''}${p.lives!=null?'♥'+p.lives:''})`).join(', ') || '<span class="muted">nobody playing</span>';

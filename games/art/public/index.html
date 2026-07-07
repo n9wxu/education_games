@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Silly Art Party!</title>
+<style>
+  *{box-sizing:border-box} html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:#fff4fb;color:#5a2a6a;overflow:hidden}
+  #wrap{max-width:960px;margin:0 auto;padding:8px;height:100dvh;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px} header h1{font-size:1.2rem;margin:0} header a{margin-left:auto;color:#a03aa0;text-decoration:none;font-weight:700}
+  #prompt{text-align:center;font-size:1.4rem;font-weight:800;color:#d63aa0} #prompt b{color:#7a2aa0}
+  #timebar{height:8px;background:#f3d6ef;border-radius:6px;overflow:hidden;margin:4px 0} #timefill{height:100%;background:linear-gradient(90deg,#ffb3e6,#ff77cc);width:100%}
+  #draw{flex:1;display:flex;gap:8px;min-height:0}
+  canvas#pad{flex:1;background:#fff;border:3px solid #ffb3e6;border-radius:14px;touch-action:none;cursor:crosshair}
+  #tools{width:120px;display:flex;flex-direction:column;gap:8px;align-items:center}
+  #hue{writing-mode:vertical-lr;height:120px}
+  .sw{width:30px;height:30px;border-radius:8px;border:2px solid #fff;cursor:pointer}
+  .swrow{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+  #tools button{border:none;border-radius:8px;padding:6px 8px;background:#f3d6ef;cursor:pointer;font-size:.85rem}
+  #gallery{display:none;flex:1;overflow:auto;min-height:0}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:6px}
+  .art{background:#fff;border:2px solid #ffb3e6;border-radius:12px;padding:8px;text-align:center}
+  .art img{width:100%;border-radius:8px;background:#fff}
+  .art .st{display:flex;gap:8px;justify-content:center;margin-top:6px}
+  .art .st button{border:none;background:#fff0fa;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:1rem}
+  .overlay{position:fixed;inset:0;background:rgba(120,40,120,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+  .panel{background:#fff;border-radius:20px;padding:24px;width:min(380px,94vw);text-align:center}
+  .panel input{width:100%;padding:12px;margin:7px 0;border-radius:10px;border:2px solid #f3d6ef}
+  .btn{background:#d63aa0;color:#fff;border:none;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer} .btn.sec{background:#f3d6ef;color:#a03aa0} .err{color:#c0392b;min-height:1em}
+</style></head><body>
+<div id="wrap">
+  <header><h1>🎨 Silly Art Party!</h1><span id="who"></span><a href="/">← Games</a></header>
+  <div id="prompt">Draw: <b id="ptext">…</b></div>
+  <div id="timebar"><div id="timefill"></div></div>
+  <div id="draw">
+    <canvas id="pad" width="720" height="440"></canvas>
+    <div id="tools">
+      <input id="hue" type="range" min="0" max="360" value="320" title="color">
+      <div class="swrow" id="swatches"></div>
+      <label style="font-size:.8rem">Pen size</label>
+      <input id="pen" type="range" min="2" max="34" value="8">
+      <button onclick="A.clear()">🧽 Clear</button>
+    </div>
+  </div>
+  <div id="gallery"><h3 style="text-align:center;margin:6px">✨ Everyone's art — give happy stickers!</h3><div class="cards" id="cards"></div></div>
+</div>
+<div class="overlay" id="loginOv"><div class="panel"><h2>🎨 Silly Art Party!</h2><p>Log in and draw silly pictures with friends!</p>
+  <input id="u" placeholder="Your name"><input id="p" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')A.login()">
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button class="btn" onclick="A.login()">Draw!</button><button class="btn sec" onclick="A.register()">New account</button></div>
+  <div class="err" id="loginErr"></div></div></div>
+<script src="/art/socket.io/socket.io.js"></script><script src="game.js"></script>
+</body></html>

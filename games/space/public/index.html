@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Space Blaster Buddies</title>
+<style>
+  *{box-sizing:border-box} html,body{margin:0;height:100%;font-family:system-ui,sans-serif;background:#04040f;color:#fff;overflow:hidden}
+  #wrap{max-width:940px;margin:0 auto;padding:8px}
+  header{display:flex;align-items:center;gap:12px} header h1{font-size:1.2rem;margin:0} header a{margin-left:auto;color:#9db4ff;text-decoration:none;font-weight:700}
+  #hud{padding:4px 6px} #hud b{color:#ffd23f} #hud .team{color:#7be06a}
+  canvas{display:block;width:100%;background:#03030c;border-radius:12px}
+  .hint{opacity:.7;font-size:.9rem;padding:2px 6px}
+  .overlay{position:fixed;inset:0;background:rgba(2,2,10,.93);display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+  .panel{background:#0f0f26;border:1px solid #2a2a55;border-radius:18px;padding:24px;width:min(380px,94vw);text-align:center}
+  .panel input{width:100%;padding:12px;margin:7px 0;border-radius:10px;border:1px solid #2a2a55;background:#04040f;color:#fff}
+  .btn{background:#4f7cff;color:#fff;border:none;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer} .btn.sec{background:#26265a} .err{color:#ff8095;min-height:1em}
+</style></head><body>
+<div id="wrap">
+  <header><h1>🚀 Space Blaster Buddies</h1><span id="who"></span><a href="/">← Games</a></header>
+  <div id="hud">Score <b id="score">0</b> · Streak <b id="streak">0</b> · Lives <b id="lives">3</b> · <span class="team">Team <b class="team" id="team">0</b></span></div>
+  <canvas id="c" width="900" height="470"></canvas>
+  <div class="hint">Press the letter on the LOWEST glowing ship to blast it. Wrong keys miss!</div>
+</div>
+<div class="overlay" id="loginOv"><div class="panel"><h2>🚀 Space Blaster Buddies</h2><p>Log in and blast enemy ships by typing their letters!</p>
+  <input id="u" placeholder="Your name"><input id="p" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')G.login()">
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button class="btn" onclick="G.login()">Play!</button><button class="btn sec" onclick="G.register()">New account</button></div>
+  <div class="err" id="loginErr"></div></div></div>
+<script src="/space/socket.io/socket.io.js"></script><script src="game.js"></script>
+</body></html>

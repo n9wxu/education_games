@@ -209,6 +209,17 @@ db.exec(`
     best_streak INTEGER DEFAULT 0,
     updated_at  INTEGER DEFAULT (unixepoch())
   );
+
+  -- ── Shared per-game stats (arcade-style games) ────────────────────────────
+  CREATE TABLE IF NOT EXISTS arcade_stats (
+    game        TEXT NOT NULL,
+    player_id   INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    correct     INTEGER DEFAULT 0,
+    incorrect   INTEGER DEFAULT 0,
+    best_streak INTEGER DEFAULT 0,
+    updated_at  INTEGER DEFAULT (unixepoch()),
+    PRIMARY KEY (game, player_id)
+  );
 `);
 
 // Idempotent migrations for DBs created by older game versions
@@ -403,6 +414,13 @@ const q = {
   rdGet:        db.prepare('SELECT * FROM reading_stats WHERE player_id = ?'),
   rdAll:        db.prepare('SELECT s.*, p.username FROM reading_stats s JOIN players p ON p.id = s.player_id ORDER BY p.username COLLATE NOCASE'),
   rdDel:        db.prepare('DELETE FROM reading_stats WHERE player_id = ?'),
+  // Shared arcade stats
+  arcInit:    db.prepare('INSERT OR IGNORE INTO arcade_stats (game, player_id) VALUES (?, ?)'),
+  arcCorrect: db.prepare('UPDATE arcade_stats SET correct = correct + 1, best_streak = MAX(best_streak, ?), updated_at = unixepoch() WHERE game = ? AND player_id = ?'),
+  arcWrong:   db.prepare('UPDATE arcade_stats SET incorrect = incorrect + 1, updated_at = unixepoch() WHERE game = ? AND player_id = ?'),
+  arcGet:     db.prepare('SELECT * FROM arcade_stats WHERE game = ? AND player_id = ?'),
+  arcAll:     db.prepare('SELECT s.*, p.username FROM arcade_stats s JOIN players p ON p.id = s.player_id WHERE game = ? ORDER BY p.username COLLATE NOCASE'),
+  arcDel:     db.prepare('DELETE FROM arcade_stats WHERE player_id = ?'),
 };
 
 function createToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -472,6 +490,7 @@ const deletePlayer = db.transaction(pid => {
   q.skDelStats.run(pid);
   q.skDelFacts.run(pid);
   q.rdDel.run(pid);
+  q.arcDel.run(pid);
   q.deletePlayer.run(pid);
 });
 
@@ -574,6 +593,11 @@ function readingRecord(pid, isCorrect, streak) {
 function readingStats(pid) { q.rdInit.run(pid); return q.rdGet.get(pid); }
 function readingAll()      { return q.rdAll.all(); }
 
+// ─── Shared arcade stats (keyed by game slug) ────────────────────────────────
+function arcadeRecord(game, pid, ok, streak) { q.arcInit.run(game, pid); if (ok) q.arcCorrect.run(streak | 0, game, pid); else q.arcWrong.run(game, pid); }
+function arcadeStats(game, pid) { q.arcInit.run(game, pid); return q.arcGet.get(game, pid); }
+function arcadeAll(game)        { return q.arcAll.all(game); }
+
 module.exports = {
   // accounts / auth
   register, findPlayer, getPlayerById, getPlayer: getPlayerById, allPlayers,
@@ -601,6 +625,8 @@ module.exports = {
   skateRecord, skateStats, skateFacts, skateAll,
   // rocket read
   readingRecord, readingStats, readingAll,
+  // shared arcade stats
+  arcadeRecord, arcadeStats, arcadeAll,
   // raw handle (for unified teacher aggregate queries if needed)
   _db: db,
 };

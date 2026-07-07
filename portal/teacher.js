@@ -179,6 +179,9 @@ module.exports = function createTeacher(mounted) {
   // ─── Rocket Read ────────────────────────────────────────────────────────────
   router.get('/api/reading', (req, res) => res.json(db.readingAll()));
 
+  // ─── Newer games (shared arcade stats) ──────────────────────────────────────
+  router.get('/api/arcade/:game', (req, res) => res.json(db.arcadeAll(req.params.game)));
+
   // ─── Spelling: recent sessions ──────────────────────────────────────────────
   router.get('/api/sessions', (req, res) => res.json(db.allSessions()));
 

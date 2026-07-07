@@ -29,6 +29,11 @@ const GAMES = [
   { key: 'typing',   base: '/typing',   title: 'Typing Train',      factory: require('./games/typing-train') },
   { key: 'skate',    base: '/skate',    title: "Skate 'n' Add",     factory: require('./games/skate') },
   { key: 'read',     base: '/read',     title: 'Rocket Read',       factory: require('./games/read') },
+  { key: 'bigger',   base: '/bigger',   title: 'Hungry Number Alligator', factory: require('./games/bigger') },
+  { key: 'citynum',  base: '/citynum',  title: 'City Number Blaster',     factory: require('./games/citynum') },
+  { key: 'tank',     base: '/tank',     title: 'Tank Squad Math Blast',   factory: require('./games/tank') },
+  { key: 'space',    base: '/space',    title: 'Space Blaster Buddies',   factory: require('./games/space') },
+  { key: 'art',      base: '/art',      title: 'Silly Art Party!',        factory: require('./games/art') },
 ];
 
 const mounted = {};   // key -> { router, io, kickPlayer, pushFocus, ... }
