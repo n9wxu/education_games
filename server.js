@@ -28,6 +28,7 @@ const GAMES = [
   { key: 'sniper',   base: '/sniper',   title: 'Spelling Sniper',   factory: require('./games/spelling-sniper') },
   { key: 'typing',   base: '/typing',   title: 'Typing Train',      factory: require('./games/typing-train') },
   { key: 'skate',    base: '/skate',    title: "Skate 'n' Add",     factory: require('./games/skate') },
+  { key: 'read',     base: '/read',     title: 'Rocket Read',       factory: require('./games/read') },
 ];
 
 const mounted = {};   // key -> { router, io, kickPlayer, pushFocus, ... }

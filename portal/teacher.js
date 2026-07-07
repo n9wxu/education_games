@@ -176,6 +176,9 @@ module.exports = function createTeacher(mounted) {
   router.get('/api/skate', (req, res) => res.json(db.skateAll()));
   router.get('/api/skate/:id/facts', (req, res) => res.json(db.skateFacts(Number(req.params.id))));
 
+  // ─── Rocket Read ────────────────────────────────────────────────────────────
+  router.get('/api/reading', (req, res) => res.json(db.readingAll()));
+
   // ─── Spelling: recent sessions ──────────────────────────────────────────────
   router.get('/api/sessions', (req, res) => res.json(db.allSessions()));
 

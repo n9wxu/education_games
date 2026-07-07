@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rocket Read</title>
+<style>
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; background:#05010f; color:#eaf0ff; overflow:hidden; }
+  #wrap { max-width:940px; margin:0 auto; padding:8px; }
+  header { display:flex; align-items:center; gap:14px; padding:4px 6px; }
+  header h1 { font-size:1.3rem; margin:0; }
+  header .sp { margin-left:auto; }
+  header a, #who { color:#9fd0ff; text-decoration:none; font-weight:600; font-size:.9rem; }
+  #hud { display:flex; gap:16px; padding:4px 8px; font-size:1rem; flex-wrap:wrap; }
+  #hud b { color:#ffd23f; }
+  canvas { display:block; width:100%; border-radius:14px; background:#080322; }
+  #stage { background:#120a35; border:1px solid #2b1d63; border-radius:14px; margin-top:8px; padding:16px; min-height:150px; }
+  #timer { height:8px; background:#2b1d63; border-radius:6px; overflow:hidden; margin-bottom:12px; }
+  #timerBar { height:100%; width:100%; background:linear-gradient(90deg,#ffd23f,#ff8a3d); transition:width .1s linear; }
+  #sentence { font-size:1.5rem; line-height:1.5; text-align:center; min-height:2.2em; }
+  #sentence .blank { display:inline-block; min-width:90px; border-bottom:3px solid #ffd23f; margin:0 4px; }
+  #answerRow { display:flex; gap:8px; margin-top:14px; justify-content:center; }
+  #answerRow input { flex:0 1 320px; padding:13px 15px; border-radius:12px; border:2px solid #2b1d63; background:#080322; color:#fff; font-size:1.2rem; text-align:center; }
+  #answerRow button { border:none; background:#ffd23f; color:#3a2a00; border-radius:12px; padding:0 18px; font-size:1.1rem; font-weight:700; cursor:pointer; }
+  #answerRow[hidden] { display:none; }
+  #feedback { text-align:center; margin-top:10px; min-height:1.4em; font-size:1.05rem; }
+  #controls { display:flex; gap:16px; align-items:center; padding:8px; font-size:.95rem; }
+  .overlay { position:fixed; inset:0; background:rgba(5,1,15,.92); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
+  .panel { background:#160c40; border:2px solid #2b1d63; border-radius:20px; padding:26px; width:min(400px,94vw); text-align:center; }
+  .panel h2 { margin:0 0 6px; } .panel p { color:#b9a9ff; margin:4px 0 14px; }
+  .panel input { width:100%; padding:12px; margin:7px 0; border-radius:12px; border:2px solid #2b1d63; background:#080322; color:#fff; font-size:1.05rem; }
+  .btn { background:#4ec3ff; color:#04203a; border:none; border-radius:12px; padding:12px 18px; font-size:1.05rem; font-weight:700; cursor:pointer; }
+  .btn.sec { background:#2b1d63; color:#eaf0ff; }
+  .err { color:#ff9db0; min-height:1em; font-size:.9rem; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <h1>🚀 Rocket Read</h1>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <a href="/">← Games</a>
+  </header>
+  <div id="hud">
+    <span>Altitude <b id="score">0</b></span>
+    <span>Streak <b id="streak">0</b></span>
+    <span>Right <b id="acc">100</b>%</span>
+  </div>
+  <canvas id="c" width="900" height="300"></canvas>
+  <div id="stage">
+    <div id="timer"><div id="timerBar"></div></div>
+    <div id="sentence">Get ready to read…</div>
+    <div id="answerRow" hidden>
+      <input id="answer" placeholder="type the missing word" autocomplete="off" autocapitalize="off" spellcheck="false"
+             onkeydown="if(event.key==='Enter')R.submit()">
+      <button onclick="R.submit()">Blast off ▲</button>
+    </div>
+    <div id="feedback"></div>
+  </div>
+  <div id="controls">
+    <label>🐢 Reading time <input id="speed" type="range" min="1" max="5" value="3"> 🐇</label>
+    <span style="opacity:.7">Read fast — the sentence hides, then fill in the missing word!</span>
+  </div>
+</div>
+
+<div class="overlay" id="loginOv">
+  <div class="panel">
+    <h2>🚀 Rocket Read</h2>
+    <p>Log in and read your way to the stars!</p>
+    <input id="u" placeholder="Your name" autocomplete="username">
+    <input id="p" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')R.login()">
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+      <button class="btn" onclick="R.login()">Launch!</button>
+      <button class="btn sec" onclick="R.register()">New account</button>
+    </div>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<script src="/read/socket.io/socket.io.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

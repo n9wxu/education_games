@@ -200,6 +200,15 @@ db.exec(`
     incorrect INTEGER DEFAULT 0,
     PRIMARY KEY (player_id, a, b)
   );
+
+  -- ── Rocket Read ───────────────────────────────────────────────────────────
+  CREATE TABLE IF NOT EXISTS reading_stats (
+    player_id   INTEGER PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
+    correct     INTEGER DEFAULT 0,
+    incorrect   INTEGER DEFAULT 0,
+    best_streak INTEGER DEFAULT 0,
+    updated_at  INTEGER DEFAULT (unixepoch())
+  );
 `);
 
 // Idempotent migrations for DBs created by older game versions
@@ -387,6 +396,13 @@ const q = {
   skAll:         db.prepare('SELECT s.*, p.username FROM skate_stats s JOIN players p ON p.id = s.player_id ORDER BY p.username COLLATE NOCASE'),
   skDelStats:    db.prepare('DELETE FROM skate_stats WHERE player_id = ?'),
   skDelFacts:    db.prepare('DELETE FROM skate_fact_stats WHERE player_id = ?'),
+  // Rocket Read
+  rdInit:       db.prepare('INSERT OR IGNORE INTO reading_stats (player_id) VALUES (?)'),
+  rdIncCorrect: db.prepare('UPDATE reading_stats SET correct = correct + 1, best_streak = MAX(best_streak, ?), updated_at = unixepoch() WHERE player_id = ?'),
+  rdIncWrong:   db.prepare('UPDATE reading_stats SET incorrect = incorrect + 1, updated_at = unixepoch() WHERE player_id = ?'),
+  rdGet:        db.prepare('SELECT * FROM reading_stats WHERE player_id = ?'),
+  rdAll:        db.prepare('SELECT s.*, p.username FROM reading_stats s JOIN players p ON p.id = s.player_id ORDER BY p.username COLLATE NOCASE'),
+  rdDel:        db.prepare('DELETE FROM reading_stats WHERE player_id = ?'),
 };
 
 function createToken() { return crypto.randomBytes(32).toString('hex'); }
@@ -455,6 +471,7 @@ const deletePlayer = db.transaction(pid => {
   q.typDelBook.run(pid);
   q.skDelStats.run(pid);
   q.skDelFacts.run(pid);
+  q.rdDel.run(pid);
   q.deletePlayer.run(pid);
 });
 
@@ -549,6 +566,14 @@ function skateStats(pid) { q.skInit.run(pid); return q.skGet.get(pid); }
 function skateFacts(pid) { return q.skFacts.all(pid); }
 function skateAll()      { return q.skAll.all(); }
 
+// ─── Rocket Read ─────────────────────────────────────────────────────────────
+function readingRecord(pid, isCorrect, streak) {
+  q.rdInit.run(pid);
+  if (isCorrect) q.rdIncCorrect.run(streak | 0, pid); else q.rdIncWrong.run(pid);
+}
+function readingStats(pid) { q.rdInit.run(pid); return q.rdGet.get(pid); }
+function readingAll()      { return q.rdAll.all(); }
+
 module.exports = {
   // accounts / auth
   register, findPlayer, getPlayerById, getPlayer: getPlayerById, allPlayers,
@@ -574,6 +599,8 @@ module.exports = {
   getSetting, setSetting, delSetting,
   // skate 'n' add
   skateRecord, skateStats, skateFacts, skateAll,
+  // rocket read
+  readingRecord, readingStats, readingAll,
   // raw handle (for unified teacher aggregate queries if needed)
   _db: db,
 };
