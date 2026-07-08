@@ -34,6 +34,8 @@ const GAMES = [
   { key: 'tank',     base: '/tank',     title: 'Tank Squad Math Blast',   factory: require('./games/tank') },
   { key: 'space',    base: '/space',    title: 'Space Blaster Buddies',   factory: require('./games/space') },
   { key: 'art',      base: '/art',      title: 'Silly Art Party!',        factory: require('./games/art') },
+  { key: 'rockite',  base: '/rockite',  title: 'Rockite Tank Blaster',    factory: require('./games/rockite') },
+  { key: 'star',     base: '/star',     title: 'Star Captain',            factory: require('./games/star') },
 ];
 
 const mounted = {};   // key -> { router, io, kickPlayer, pushFocus, ... }

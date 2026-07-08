@@ -112,6 +112,8 @@ const ARCADE = [
   { key:'tank',    name:'💥 Tank Squad Math Blast' },
   { key:'space',   name:'🚀 Space Blaster Buddies' },
   { key:'art',     name:'🎨 Silly Art Party! (drawings made)' },
+  { key:'rockite', name:'🟩 Rockite Tank Blaster' },
+  { key:'star',    name:'⭐ Star Captain (astronomy)' },
 ];
 async function loadMore() {
   const el = document.getElementById('panel-more');
@@ -403,7 +405,7 @@ async function loadLive() {
     const el = document.getElementById('panel-live');
     if (!document.getElementById('panel-live').classList.contains('active')) { clearInterval(liveTimer); return; }
     const live = await api('/live');
-    const names = { math:'🐊 Math Gator', spelling:'👾 Spelling Invaders', sniper:'🎯 Spelling Sniper', typing:'🚂 Typing Train', skate:"🛼 Skate 'n' Add", read:'🚀 Rocket Read', bigger:'🐊 Hungry Alligator', citynum:'🔫 City Number Blaster', tank:'💥 Tank Squad', space:'🚀 Space Blaster', art:'🎨 Silly Art Party' };
+    const names = { math:'🐊 Math Gator', spelling:'👾 Spelling Invaders', sniper:'🎯 Spelling Sniper', typing:'🚂 Typing Train', skate:"🛼 Skate 'n' Add", read:'🚀 Rocket Read', bigger:'🐊 Hungry Alligator', citynum:'🔫 City Number Blaster', tank:'💥 Tank Squad', space:'🚀 Space Blaster', art:'🎨 Silly Art Party', rockite:'🟩 Rockite Tank Blaster', star:'⭐ Star Captain' };
     el.innerHTML = Object.entries(live).map(([k,v]) => {
       if (!v) return '';
       const players = (v.players||[]).map(p=>`${esc(p.username)} (${p.score??''}${p.lives!=null?'♥'+p.lives:''})`).join(', ') || '<span class="muted">nobody playing</span>';

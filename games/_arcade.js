@@ -12,7 +12,7 @@ const { requireAuth, playerFromSocket } = require('../shared/auth');
 
 const COLORS = ['#ffd23f','#4ec3ff','#7be06a','#ff5aa5','#b06bff','#ff8a3d','#40e0d0','#ff6b6b'];
 
-module.exports = function roundGame({ base, io, key, publicDir, makeRound, cooperative = false }) {
+module.exports = function roundGame({ base, io, key, publicDir, makeRound, cooperative = false, cheers = null }) {
   const router = express.Router();
   router.use(express.json());
   router.use(express.static(publicDir));
@@ -33,7 +33,7 @@ module.exports = function roundGame({ base, io, key, publicDir, makeRound, coope
       if (!player) { socket.emit('authError'); return; }
       joined = true;
       rink.set(socket.id, { username: player.username, color, score: 0, streak: 0 });
-      socket.emit('joined', { color, username: player.username, cooperative, teamScore, peers: peers().filter(p => p.id !== socket.id) });
+      socket.emit('joined', { color, username: player.username, cooperative, teamScore, cheers, peers: peers().filter(p => p.id !== socket.id) });
       socket.broadcast.emit('peerJoined', { id: socket.id, username: player.username, color, score: 0 });
     });
 
@@ -56,6 +56,12 @@ module.exports = function roundGame({ base, io, key, publicDir, makeRound, coope
       else    { if (me) me.streak = 0; db.arcadeRecord(key, player.id, false, 0); }
       socket.emit('result', { correct: ok, answer: r.correct });
       if (me) socket.broadcast.emit('peerScore', { id: socket.id, score: me.score });
+    });
+
+    // Preset friendly cheers only (no free text) — relayed to other players.
+    if (cheers) socket.on('cheer', ({ msg }) => {
+      const me = rink.get(socket.id);
+      if (me && cheers.includes(msg)) socket.broadcast.emit('peerCheer', { username: me.username, msg });
     });
 
     socket.on('disconnect', () => { if (joined) { rink.delete(socket.id); rounds.delete(socket.id); socket.broadcast.emit('peerLeft', { id: socket.id }); } });
