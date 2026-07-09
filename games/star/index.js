@@ -1,12 +1,24 @@
 'use strict';
 // ─── Star Captain: Race by the Stars ─────────────────────────────────────────
-// v1 — the astronomy-recognition core (Request #20, by Dad). The captain learns
-// the night sky: TRACE a constellation by connecting its stars in order, and NAME
-// the highlighted stars. Star naming is server-graded (options shown, answer kept
-// on the server). Observe-only friendly race with a leaderboard.
+// v2 — teach then reinforce, with difficulty that scales as the learner improves.
+// (Request #20, by Dad. Feedback: add a tutorial per level; drop the clumsy
+// "draw over the constellation" trace; start pre-drawn with multiple choice, then
+// fade the drawing as skill develops, and finally a realistic sky where the
+// constellation blends into the other stars; subtle real star colours.)
 //
-// PHASE 2 (needs go-ahead — a big sustained build): the virtual sextant, computing
-// latitude/longitude from star tables + time, chart plotting, and dead reckoning.
+// Flow per constellation: a TUTORIAL first (labelled, exaggerated, teaches the
+// star names + colours), then multiple-choice reinforcement (name the glowing
+// star / name the constellation). All graded on the server; star/constellation
+// names being asked for are never sent on the wire. Difficulty tier comes from
+// the learner's own accumulated correct answers:
+//   tier 0  bright drawn lines + labels-off  (beginner)
+//   tier 1  faded lines                      (developing)
+//   tier 2  realistic dense star field, no lines — the figure blends in (skilled)
+// The background field is seeded per round (randomised) so it can't be memorised.
+//
+// PHASE 2 (pending go-ahead): virtual sextant, latitude/longitude from star tables
+// + time, chart plotting, dead reckoning. And optional real public-domain photos
+// for the top tier (the procedural realistic field currently fills that role).
 const express = require('express');
 const path    = require('path');
 const db      = require('../../shared/db');
@@ -16,6 +28,7 @@ const COLORS = ['#ffd23f','#9fd0ff','#7be06a','#ff9db0','#c9a0ff','#ffd0a0'];
 const rand = n => Math.floor(Math.random() * n);
 const shuffle = a => a.slice().sort(() => Math.random() - 0.5);
 const allStarNames = CONST.flatMap(c => c.stars.map(s => s.name));
+const allConstNames = CONST.map(c => c.name);
 
 module.exports = function createStar({ base = '/star', io }) {
   const router = express.Router();
@@ -23,6 +36,7 @@ module.exports = function createStar({ base = '/star', io }) {
   router.use(express.static(path.join(__dirname, 'public')));
   const rink = new Map();   // socketId -> { username, color, score }
   const board = () => Array.from(rink.values()).map(p => ({ username: p.username, color: p.color, score: p.score })).sort((a, b) => b.score - a.score).slice(0, 8);
+  const tierFor = pid => { const c = (db.arcadeStats('star', pid) || {}).correct || 0; return c < 6 ? 0 : c < 16 ? 1 : 2; };
 
   router.get('/api/my-stats', requireAuth, (req, res) => res.json(db.arcadeStats('star', req.player.id)));
 
@@ -30,6 +44,7 @@ module.exports = function createStar({ base = '/star', io }) {
     const player = playerFromSocket(socket);
     const color = COLORS[rand(COLORS.length)];
     let joined = false, streak = 0, answer = null;
+    const seen = new Set();
 
     socket.on('join', () => {
       if (!player) { socket.emit('authError'); return; }
@@ -39,30 +54,37 @@ module.exports = function createStar({ base = '/star', io }) {
       sendChallenge();
     });
 
-    // Star positions/magnitudes only on the wire — never the star names, so the
-    // "name" answer can't be read from the payload.
-    const strip = c => ({ name: c.name, hint: c.hint, stars: c.stars.map(s => ({ x: s.x, y: s.y, mag: s.mag })), line: c.line });
+    // stars for the wire: positions/magnitudes/colours only — never the name being asked for
+    const stripStars = c => c.stars.map(s => ({ x: s.x, y: s.y, mag: s.mag, color: s.color }));
+
     function sendChallenge() {
       const c = CONST[rand(CONST.length)];
-      if (Math.random() < 0.5) {
+      if (!seen.has(c.name)) {            // teach this constellation before quizzing it
+        seen.add(c.name); answer = { type: 'tutorial' };
+        socket.emit('challenge', { type: 'tutorial', c: { name: c.name, hint: c.hint, stars: c.stars, line: c.line } });
+        return;
+      }
+      const tier = tierFor(player.id), seed = (Math.random() * 1e9) | 0;
+      if (Math.random() < 0.5) {          // name the glowing star
         const si = rand(c.stars.length);
         const wrong = shuffle(allStarNames.filter(n => n !== c.stars[si].name)).slice(0, 3);
         answer = { type: 'name', name: c.stars[si].name };
-        socket.emit('challenge', { type: 'name', c: strip(c), starIdx: si, options: shuffle([c.stars[si].name, ...wrong]) });
-      } else {
-        answer = { type: 'trace' };
-        socket.emit('challenge', { type: 'trace', c: strip(c) });   // guided practice
+        socket.emit('challenge', { type: 'name-star', tier, seed, name: c.name, stars: stripStars(c), line: c.line, starIdx: si, options: shuffle([c.stars[si].name, ...wrong]) });
+      } else {                            // name the constellation (name withheld)
+        const wrong = shuffle(allConstNames.filter(n => n !== c.name)).slice(0, 3);
+        answer = { type: 'name', name: c.name };
+        socket.emit('challenge', { type: 'name-constellation', tier, seed, stars: stripStars(c), line: c.line, options: shuffle([c.name, ...wrong]) });
       }
     }
     function grade(ok) {
       if (ok) { streak++; const me = rink.get(socket.id); if (me) me.score++; db.arcadeRecord('star', player.id, true, streak); }
       else { streak = 0; db.arcadeRecord('star', player.id, false, 0); }
-      socket.emit('result', { correct: ok });
+      socket.emit('result', { correct: ok, answer: answer && answer.name });
+      answer = null;
       io.emit('leaderboard', board());
     }
-    socket.on('answer', ({ name }) => { if (!answer || answer.type !== 'name') return; const ok = name === answer.name; answer = null; grade(ok); });
-    socket.on('traced', () => { if (!answer || answer.type !== 'trace') return; answer = null; grade(true); });  // guided completion
-    socket.on('next', () => sendChallenge());
+    socket.on('answer', ({ name }) => { if (!answer || answer.type !== 'name') return; grade(name === answer.name); });
+    socket.on('next', () => sendChallenge());   // tutorial → next; result → next
     socket.on('disconnect', () => { if (joined) { rink.delete(socket.id); io.emit('leaderboard', board()); } });
   });
 
